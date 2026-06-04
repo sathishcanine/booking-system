@@ -1,0 +1,321 @@
+/* Monthly calendar — FareHarbor-style */
+
+.app--calendar {
+  background: #e8f0f7;
+}
+
+.main--calendar {
+  max-width: none;
+  padding: 0;
+  margin: 0;
+}
+
+.calendar-month-page {
+  padding: 1.25rem 1rem 2.5rem;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.calendar-hero-title {
+  text-align: center;
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  margin: 0 0 1.25rem;
+  color: #1a1a1a;
+}
+
+.cal-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  padding: 0 0.5rem;
+}
+
+.cal-toolbar-center {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.cal-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.btn-book-online {
+  background: #2c3e50;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  padding: 0.5rem 1rem;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.btn-book-online:hover {
+  background: #1a252f;
+}
+
+.cal-select {
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.4rem 0.75rem;
+  font: inherit;
+  font-size: 0.95rem;
+  background: #fff;
+  min-width: 6rem;
+}
+
+.realtime-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.realtime-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #27ae60;
+  box-shadow: 0 0 0 2px rgba(39, 174, 96, 0.25);
+}
+
+.cal-nav-arrows {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.cal-arrow {
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--border);
+  background: #fff;
+  border-radius: 4px;
+  font-size: 1.25rem;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--blue);
+}
+
+.cal-arrow:hover {
+  background: #f0f6fc;
+}
+
+.month-calendar-wrap {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.month-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  background: #f7f9fb;
+  border-bottom: 1px solid var(--border);
+}
+
+.month-weekdays span {
+  text-align: center;
+  padding: 0.6rem 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+}
+
+.month-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+}
+
+.month-cell {
+  min-height: 140px;
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  padding: 0.35rem;
+  position: relative;
+  vertical-align: top;
+  background: #fff;
+}
+
+.month-cell:nth-child(7n) {
+  border-right: none;
+}
+
+.month-cell--outside {
+  background: #fafbfc;
+}
+
+.month-cell--past .month-date {
+  color: #b0b8c0;
+}
+
+.month-cell--past .slot-card {
+  opacity: 0.85;
+}
+
+.month-date {
+  display: block;
+  text-align: right;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 0.25rem;
+  padding-right: 0.15rem;
+}
+
+.month-date--today {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  margin-left: auto;
+  margin-right: 0;
+  float: right;
+  background: #1a1a1a;
+  color: #fff;
+  border-radius: 50%;
+  font-size: 0.8rem;
+}
+
+.month-slots {
+  clear: both;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.calendar-error {
+  padding: 1rem;
+  text-align: center;
+}
+
+/* Slot cards in month view */
+.month-slots .slot-card {
+  margin-bottom: 0;
+  font-size: 0.72rem;
+}
+
+.month-slots .slot-card-img {
+  height: 48px;
+}
+
+.month-slots .slot-title {
+  font-size: 0.78rem;
+  line-height: 1.2;
+}
+
+.month-slots .slot-time {
+  font-size: 0.78rem;
+}
+
+.month-slots .slot-location,
+.month-slots .slot-desc {
+  font-size: 0.68rem;
+  line-height: 1.25;
+}
+
+.slot-brand-banner {
+  background: linear-gradient(135deg, #1a4d7c, #0d3358);
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-align: center;
+  padding: 0.35rem 0.25rem;
+  letter-spacing: 0.05em;
+}
+
+.slot-urgency {
+  margin: 0.2rem 0 0;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--orange);
+}
+
+.slot-waitlist-btn {
+  display: inline-block;
+  margin-top: 0.25rem;
+  padding: 0.15rem 0.5rem;
+  background: var(--purple);
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 700;
+  border-radius: 3px;
+}
+
+.slot-call-book {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--blue);
+}
+
+.slot-card--call {
+  cursor: pointer;
+}
+
+.slot-promo {
+  font-size: 0.65rem;
+  color: #27ae60;
+  font-weight: 600;
+}
+
+.month-slots .show-more {
+  text-align: left;
+  padding: 0.15rem 0;
+  font-size: 0.72rem;
+}
+
+@media (max-width: 1100px) {
+  .month-grid {
+    font-size: 0.9rem;
+  }
+
+  .month-cell {
+    min-height: 100px;
+  }
+}
+
+@media (max-width: 768px) {
+  .cal-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .cal-toolbar-right {
+    justify-content: space-between;
+  }
+
+  .month-weekdays span {
+    font-size: 0.65rem;
+  }
+
+  .month-cell {
+    min-height: 80px;
+    padding: 0.2rem;
+  }
+
+  .month-slots .slot-card {
+    display: none;
+  }
+
+  .month-slots .slot-card:first-child {
+    display: block;
+  }
+
+  .month-slots .show-more {
+    display: block;
+  }
+}
