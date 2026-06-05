@@ -24,6 +24,7 @@ from app.admin_schemas import (
 )
 from app.database import get_db
 from app.models import Activity, Booking, BookingItem, BookingStatus, PromoCode, Slot, TicketType
+from app.services.promo import release_promo_use
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
 
@@ -415,6 +416,17 @@ def update_promo(promo_id: int, body: AdminPromoIn, db: Session = Depends(get_db
     return AdminPromoOut.model_validate(promo)
 
 
+@router.post("/promos/{promo_id}/reset-usage", dependencies=[Depends(require_admin)])
+def reset_promo_usage(promo_id: int, db: Session = Depends(get_db)):
+    promo = db.query(PromoCode).filter(PromoCode.id == promo_id).first()
+    if not promo:
+        raise HTTPException(404, "Promo not found")
+    promo.used_count = 0
+    db.commit()
+    db.refresh(promo)
+    return AdminPromoOut.model_validate(promo)
+
+
 @router.delete("/promos/{promo_id}", dependencies=[Depends(require_admin)])
 def delete_promo(promo_id: int, db: Session = Depends(get_db)):
     promo = db.query(PromoCode).filter(PromoCode.id == promo_id).first()
@@ -497,6 +509,7 @@ def cancel_booking(booking_id: int, db: Session = Depends(get_db)):
         if slot:
             qty = sum(i.quantity for i in booking.items)
             slot.booked_count = max(0, slot.booked_count - qty)
+        release_promo_use(db, booking.promo_code)
     booking.status = BookingStatus.CANCELLED
     db.commit()
     return {"ok": True, "reference": booking.reference}

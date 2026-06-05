@@ -35,6 +35,7 @@ from app.services.availability import (
 )
 from app.services.booking import create_booking, pending_holds_for_slot
 from app.services.pricing import apply_promo
+from app.services.promo import is_promo_exhausted
 from app.routers import admin as admin_router
 from app.services.stripe_service import attach_payment_intent, confirm_booking_paid
 
@@ -215,6 +216,8 @@ def validate_promo(body: PromoValidateIn, db: Session = Depends(get_db)):
         return PromoValidateOut(valid=False, message="Invalid promo code")
     if promo.valid_until and promo.valid_until < utcnow():
         return PromoValidateOut(valid=False, message="Promo expired")
+    if is_promo_exhausted(promo):
+        return PromoValidateOut(valid=False, message="Promo code no longer available")
     discount = apply_promo(promo, body.subtotal_cents)
     return PromoValidateOut(valid=True, discount_cents=discount, message="Promo applied")
 

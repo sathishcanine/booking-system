@@ -287,6 +287,8 @@ export const admin = {
       }),
     delete: (id: number) =>
       adminFetch<{ ok: boolean }>(`/api/admin/promos/${id}`, { method: "DELETE" }),
+    resetUsage: (id: number) =>
+      adminFetch<AdminPromo>(`/api/admin/promos/${id}/reset-usage`, { method: "POST" }),
   },
   bookings: {
     list: (params?: { status?: string; slot_id?: number }) => {

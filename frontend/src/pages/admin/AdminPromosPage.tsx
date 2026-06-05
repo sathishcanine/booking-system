@@ -73,6 +73,16 @@ export default function AdminPromosPage() {
     load();
   }
 
+  async function resetUsage(id: number, code: string) {
+    if (!confirm(`Reset usage count for ${code}?`)) return;
+    try {
+      await admin.promos.resetUsage(id);
+      load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Reset failed");
+    }
+  }
+
   return (
     <>
       <header className="admin-topbar">
@@ -198,12 +208,24 @@ export default function AdminPromosPage() {
                 <td>
                   {p.used_count}
                   {p.max_uses != null ? ` / ${p.max_uses}` : ""}
+                  {p.max_uses != null && p.used_count >= p.max_uses && (
+                    <span className="admin-badge admin-badge-expired"> Exhausted</span>
+                  )}
                 </td>
                 <td>{p.is_active ? "Active" : "Inactive"}</td>
                 <td>
                   <button type="button" className="admin-btn admin-btn-sm" onClick={() => edit(p)}>
                     Edit
                   </button>{" "}
+                  {p.used_count > 0 && (
+                    <button
+                      type="button"
+                      className="admin-btn admin-btn-sm"
+                      onClick={() => resetUsage(p.id, p.code)}
+                    >
+                      Reset uses
+                    </button>
+                  )}{" "}
                   <button
                     type="button"
                     className="admin-btn admin-btn-sm admin-btn-danger"

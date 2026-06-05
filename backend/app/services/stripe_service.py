@@ -2,6 +2,7 @@ import stripe
 
 from app.config import settings
 from app.models import Booking, BookingStatus
+from app.services.promo import record_promo_use
 
 stripe.api_key = settings.stripe_secret_key
 
@@ -69,6 +70,7 @@ def confirm_booking_paid(db, booking_id: int, payment_intent_id: str) -> bool:
 
     if booking.is_waitlist:
         booking.status = BookingStatus.PAID
+        record_promo_use(db, booking.promo_code)
         db.commit()
         return True
 
@@ -82,5 +84,6 @@ def confirm_booking_paid(db, booking_id: int, payment_intent_id: str) -> bool:
 
     slot.booked_count += qty
     booking.status = BookingStatus.PAID
+    record_promo_use(db, booking.promo_code)
     db.commit()
     return True

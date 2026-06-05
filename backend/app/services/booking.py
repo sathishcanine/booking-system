@@ -20,6 +20,7 @@ from app.models import (
 from app.schemas import BookingLineIn, CreateBookingIn
 from app.services.availability import is_slot_in_past, slot_status, spots_left
 from app.services.pricing import apply_promo, calc_tax
+from app.services.promo import is_promo_exhausted
 
 
 def _ref() -> str:
@@ -115,7 +116,7 @@ def create_booking(db: Session, payload: CreateBookingIn) -> Booking:
             raise ValueError("Invalid promo code")
         if promo.valid_until and promo.valid_until < utcnow():
             raise ValueError("Promo code expired")
-        if promo.max_uses and promo.used_count >= promo.max_uses:
+        if is_promo_exhausted(promo):
             raise ValueError("Promo code no longer available")
 
     discount = apply_promo(promo, subtotal)
