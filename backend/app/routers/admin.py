@@ -9,6 +9,7 @@ from app.admin_schemas import (
     AdminActivityIn,
     AdminActivityListItem,
     AdminActivityOut,
+    AdminBookingItemOut,
     AdminBookingOut,
     AdminBulkSlotsIn,
     AdminDashboardOut,
