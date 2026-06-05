@@ -1,10 +1,15 @@
 import re
 from datetime import date, datetime, time
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session, joinedload
 
 from app.admin_auth import issue_admin_token, require_admin, verify_admin_password
+from app.admin_login_limiter import (
+    check_login_allowed,
+    clear_login_attempts,
+    record_login_failure,
+)
 from app.admin_schemas import (
     AdminActivityIn,
     AdminActivityListItem,
@@ -76,10 +81,20 @@ def _slot_out(slot: Slot) -> AdminSlotOut:
 
 
 @router.post("/login", response_model=AdminLoginOut)
-def admin_login(body: AdminLoginIn):
+def admin_login(body: AdminLoginIn, request: Request):
+    check_login_allowed(request)
     if not verify_admin_password(body.password):
+        record_login_failure(request)
         raise HTTPException(401, "Invalid password")
-    return AdminLoginOut(token=issue_admin_token())
+    clear_login_attempts(request)
+    token, expires_in = issue_admin_token()
+    return AdminLoginOut(token=token, expires_in=expires_in)
+
+
+@router.post("/refresh", response_model=AdminLoginOut, dependencies=[Depends(require_admin)])
+def admin_refresh():
+    token, expires_in = issue_admin_token()
+    return AdminLoginOut(token=token, expires_in=expires_in)
 
 
 @router.get("/dashboard", response_model=AdminDashboardOut, dependencies=[Depends(require_admin)])

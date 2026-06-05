@@ -9,6 +9,8 @@ class AdminLoginIn(BaseModel):
 
 class AdminLoginOut(BaseModel):
     token: str
+    expires_in: int
+    token_type: str = "bearer"
 
 
 class AdminTicketTypeIn(BaseModel):

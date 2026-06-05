@@ -409,12 +409,18 @@ Staff can manage the catalog without editing the database or re-running seed.
 
 ```env
 ADMIN_PASSWORD=your-secure-password
-ADMIN_API_KEY=generate-a-long-random-string
+ADMIN_JWT_SECRET=generate-a-random-string-at-least-32-characters
+ADMIN_JWT_EXPIRE_MINUTES=30
+REQUIRE_STRONG_ADMIN_SECRETS=true
 ```
+
+Generate a secret: `python -c "import secrets; print(secrets.token_urlsafe(48))"`
 
 2. Restart the API, then open **[http://localhost:5173/admin/login](http://localhost:5173/admin/login)**.
 
-3. Sign in with `ADMIN_PASSWORD`. The app stores the API token in your browser.
+3. Sign in with `ADMIN_PASSWORD`. The app stores a **short-lived JWT** (default 30 minutes) in your browser and refreshes it automatically before expiry.
+
+Login is rate-limited (default: 5 failed attempts per IP per 15 minutes).
 
 | Admin section | What you can do |
 |---------------|-----------------|
@@ -433,7 +439,7 @@ Public calendar at `/` updates immediately when you add departures.
 - [ ] PostgreSQL + backups
 - [ ] HTTPS + Stripe live keys
 - [ ] Webhook endpoint on HTTPS (`payment_intent.succeeded`)
-- [x] Admin UI at `/admin` (set `ADMIN_PASSWORD` + `ADMIN_API_KEY` in production)
+- [x] Admin UI at `/admin` (set `ADMIN_PASSWORD` + `ADMIN_JWT_SECRET`, enable `REQUIRE_STRONG_ADMIN_SECRETS`)
 - [ ] Email confirmations after payment
 - [ ] Refund/cancel policy in Stripe Dashboard
 - [ ] Store slot times in UTC; display in `SITE_TIMEZONE`

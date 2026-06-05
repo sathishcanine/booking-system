@@ -1,16 +1,44 @@
 const API = import.meta.env.VITE_API_URL || "";
 const TOKEN_KEY = "coastal_admin_token";
+const EXPIRES_KEY = "coastal_admin_expires_at";
 
-export function getAdminToken(): string | null {
-  return localStorage.getItem(TOKEN_KEY);
+function isTokenExpired(): boolean {
+  const raw = localStorage.getItem(EXPIRES_KEY);
+  if (!raw) return true;
+  const expiresAt = Number(raw);
+  if (!Number.isFinite(expiresAt)) return true;
+  return Date.now() >= expiresAt;
 }
 
-export function setAdminToken(token: string) {
+export function getAdminToken(): string | null {
+  const token = localStorage.getItem(TOKEN_KEY);
+  if (!token || isTokenExpired()) {
+    clearAdminToken();
+    return null;
+  }
+  return token;
+}
+
+export function setAdminToken(token: string, expiresInSeconds: number) {
   localStorage.setItem(TOKEN_KEY, token);
+  localStorage.setItem(
+    EXPIRES_KEY,
+    String(Date.now() + Math.max(0, expiresInSeconds) * 1000)
+  );
 }
 
 export function clearAdminToken() {
   localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(EXPIRES_KEY);
+}
+
+/** Seconds until the stored session expires (0 if missing/expired). */
+export function adminSessionSecondsRemaining(): number {
+  const raw = localStorage.getItem(EXPIRES_KEY);
+  if (!raw) return 0;
+  const expiresAt = Number(raw);
+  if (!Number.isFinite(expiresAt)) return 0;
+  return Math.max(0, Math.floor((expiresAt - Date.now()) / 1000));
 }
 
 function formatApiError(data: unknown, status: number): string {
@@ -216,6 +244,12 @@ export type AdminBooking = {
   items: { ticket_name: string; quantity: number; unit_price_cents: number }[];
 };
 
+type AdminAuthResponse = { token: string; expires_in: number; token_type?: string };
+
+function storeAdminAuth(data: AdminAuthResponse) {
+  setAdminToken(data.token, data.expires_in);
+}
+
 export async function adminLogin(password: string) {
   const r = await fetch(`${API}/api/admin/login`, {
     method: "POST",
@@ -224,10 +258,37 @@ export async function adminLogin(password: string) {
   });
   const data = await r.json().catch(() => ({}));
   if (!r.ok) {
-    throw new Error(typeof data.detail === "string" ? data.detail : "Invalid password");
+    throw new Error(
+      typeof data.detail === "string" ? data.detail : "Invalid password"
+    );
   }
-  setAdminToken(data.token);
-  return data as { token: string };
+  const auth = data as AdminAuthResponse;
+  storeAdminAuth(auth);
+  return auth;
+}
+
+/** Renew JWT before it expires (requires a valid session). */
+export async function adminRefreshSession(): Promise<boolean> {
+  const token = localStorage.getItem(TOKEN_KEY);
+  if (!token || isTokenExpired()) {
+    clearAdminToken();
+    return false;
+  }
+  try {
+    const r = await fetch(`${API}/api/admin/refresh`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      if (r.status === 401) clearAdminToken();
+      return false;
+    }
+    storeAdminAuth(data as AdminAuthResponse);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export const admin = {

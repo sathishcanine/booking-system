@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from pydantic import field_validator
+from pydantic import AliasChoices, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BACKEND_ROOT = Path(__file__).resolve().parent.parent
@@ -29,7 +29,14 @@ class Settings(BaseSettings):
     default_booking_cutoff_hours: int = 2
     site_timezone: str = "America/New_York"
     admin_password: str = "changeme"
-    admin_api_key: str = "dev-admin-change-me-in-production"
+    admin_jwt_secret: str = Field(
+        default="dev-jwt-secret-change-me-in-production",
+        validation_alias=AliasChoices("ADMIN_JWT_SECRET", "ADMIN_API_KEY"),
+    )
+    admin_jwt_expire_minutes: int = 30
+    admin_login_max_attempts: int = 5
+    admin_login_window_seconds: int = 900
+    require_strong_admin_secrets: bool = False
 
 
 settings = Settings()

@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session, joinedload
 
 import stripe
 
+from app.admin_auth import validate_admin_auth_config
 from app.config import settings
 from app.database import get_db
 from app.models import Activity, Booking, BookingStatus, PromoCode, Slot
@@ -93,6 +94,7 @@ def expire_stale_holds(db: Session):
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    validate_admin_auth_config()
     seed()
     yield
 
