@@ -7,6 +7,20 @@ from app.models import Slot, SlotStatus
 from app.schemas import CalendarCellOut, CalendarMonthOut, CalendarSlotOut
 from app.services.availability import booking_deadline, effective_cutoff_hours, slot_status
 from app.services.booking import pending_holds_for_slot
+from app.timeutil import UTC
+
+
+def public_calendar_min_starts_at(today: date) -> datetime:
+    """Earliest departure datetime shown on the public booking calendar."""
+    return datetime.combine(today, datetime.min.time(), tzinfo=UTC)
+
+
+def slot_on_public_calendar(slot: Slot, today: date) -> bool:
+    """True when a departure is today or in the future (by calendar date)."""
+    start = slot.starts_at
+    if start.tzinfo is None:
+        start = start.replace(tzinfo=UTC)
+    return start.date() >= today
 
 
 def _month_bounds(year: int, month: int) -> tuple[date, date]:
@@ -61,8 +75,13 @@ def build_month_calendar(db: Session, year: int, month: int) -> CalendarMonthOut
     grid_start = _grid_start(first)
     grid_end = _grid_end(last)
 
-    range_start = datetime.combine(grid_start, datetime.min.time())
-    range_end = datetime.combine(grid_end + timedelta(days=1), datetime.min.time())
+    range_start = max(
+        datetime.combine(grid_start, datetime.min.time(), tzinfo=UTC),
+        public_calendar_min_starts_at(today),
+    )
+    range_end = datetime.combine(
+        grid_end + timedelta(days=1), datetime.min.time(), tzinfo=UTC
+    )
 
     slots = (
         db.query(Slot)
@@ -78,19 +97,22 @@ def build_month_calendar(db: Session, year: int, month: int) -> CalendarMonthOut
 
     by_date: dict[date, list[CalendarSlotOut]] = {}
     for slot in slots:
+        if not slot_on_public_calendar(slot, today):
+            continue
         d = slot.starts_at.date()
         by_date.setdefault(d, []).append(slot_to_out(db, slot))
 
     cells: list[CalendarCellOut] = []
     cursor = grid_start
     while cursor <= grid_end:
+        day_slots = by_date.get(cursor, []) if cursor >= today else []
         cells.append(
             CalendarCellOut(
                 date=cursor,
                 in_month=cursor.month == month and cursor.year == year,
                 is_today=cursor == today,
                 is_past=cursor < today,
-                slots=by_date.get(cursor, []),
+                slots=day_slots,
             )
         )
         cursor += timedelta(days=1)

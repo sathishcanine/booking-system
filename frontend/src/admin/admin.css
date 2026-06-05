@@ -43,6 +43,25 @@
   color: #fff;
 }
 
+.admin-sidebar-footer {
+  padding: 1rem 1.25rem 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.admin-sidebar-footer-btn {
+  display: block;
+  width: 100%;
+  text-align: center;
+  color: #0f3d5c;
+  text-decoration: none;
+}
+
+.admin-sidebar-footer-btn:hover {
+  color: #0f3d5c;
+}
+
 .admin-main {
   flex: 1;
   padding: 1.5rem 2rem 3rem;

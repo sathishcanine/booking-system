@@ -7,10 +7,36 @@ const WEEKDAYS = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
 const VISIBLE_SLOTS = 3;
 
 function useMonthNav(initial = new Date()) {
+  const now = new Date();
+  const minYear = now.getFullYear();
+  const minMonth = now.getMonth() + 1;
+
   const [year, setYear] = useState(initial.getFullYear());
   const [month, setMonth] = useState(initial.getMonth() + 1);
 
+  const clampMonthYear = (y: number, m: number) => {
+    if (y < minYear || (y === minYear && m < minMonth)) {
+      return { year: minYear, month: minMonth };
+    }
+    return { year: y, month: m };
+  };
+
+  const setYearClamped = (y: number) => {
+    const next = clampMonthYear(y, month);
+    setYear(next.year);
+    setMonth(next.month);
+  };
+
+  const setMonthClamped = (m: number) => {
+    const next = clampMonthYear(year, m);
+    setYear(next.year);
+    setMonth(next.month);
+  };
+
+  const canGoPrev = year > minYear || (year === minYear && month > minMonth);
+
   const goPrev = () => {
+    if (!canGoPrev) return;
     if (month === 1) {
       setYear((y) => y - 1);
       setMonth(12);
@@ -24,7 +50,17 @@ function useMonthNav(initial = new Date()) {
     } else setMonth((m) => m + 1);
   };
 
-  return { year, month, setYear, setMonth, goPrev, goNext };
+  return {
+    year,
+    month,
+    minYear,
+    minMonth,
+    canGoPrev,
+    setYear: setYearClamped,
+    setMonth: setMonthClamped,
+    goPrev,
+    goNext,
+  };
 }
 
 function DayCell({
@@ -37,8 +73,9 @@ function DayCell({
   onToggleExpand: () => void;
 }) {
   const dayNum = new Date(cell.date + "T12:00:00").getDate();
-  const visible = expanded ? cell.slots : cell.slots.slice(0, VISIBLE_SLOTS);
-  const hidden = cell.slots.length - VISIBLE_SLOTS;
+  const slots = cell.is_past ? [] : cell.slots;
+  const visible = expanded ? slots : slots.slice(0, VISIBLE_SLOTS);
+  const hidden = slots.length - VISIBLE_SLOTS;
 
   return (
     <div
@@ -102,6 +139,9 @@ export default function CalendarPage() {
       <CalendarToolbar
         year={nav.year}
         month={nav.month}
+        minYear={nav.minYear}
+        minMonth={nav.minMonth}
+        canGoPrev={nav.canGoPrev}
         onMonthChange={nav.setMonth}
         onYearChange={nav.setYear}
         onPrev={nav.goPrev}

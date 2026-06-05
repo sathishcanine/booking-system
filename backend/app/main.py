@@ -26,14 +26,21 @@ from app.schemas import (
     SlotDetailOut,
     TicketTypeOut,
 )
-from app.services.calendar_grid import build_month_calendar, slot_to_out
+from app.services.calendar_grid import (
+    build_month_calendar,
+    public_calendar_min_starts_at,
+    slot_on_public_calendar,
+    slot_to_out,
+)
 from app.seed import seed
 from app.services.availability import (
     booking_deadline,
     effective_cutoff_hours,
+    is_slot_departed,
     slot_status,
     spots_left,
 )
+from app.timeutil import UTC
 from app.services.booking import create_booking, pending_holds_for_slot
 from app.services.pricing import apply_promo
 from app.services.promo import is_promo_exhausted
@@ -142,11 +149,16 @@ def get_calendar_month(
 def get_calendar(week_start: date | None = None, db: Session = Depends(get_db)):
     expire_stale_holds(db)
     today = date.today()
-    start = week_start or today - timedelta(days=today.weekday())
+    start = week_start or today
+    if start < today:
+        start = today
     end = start + timedelta(days=6)
 
-    range_start = datetime.combine(start, datetime.min.time())
-    range_end = datetime.combine(end + timedelta(days=1), datetime.min.time())
+    range_start = max(
+        datetime.combine(start, datetime.min.time(), tzinfo=UTC),
+        public_calendar_min_starts_at(today),
+    )
+    range_end = datetime.combine(end + timedelta(days=1), datetime.min.time(), tzinfo=UTC)
 
     slots = (
         db.query(Slot)
@@ -166,8 +178,10 @@ def get_calendar(week_start: date | None = None, db: Session = Depends(get_db)):
         days_map[d] = []
 
     for slot in slots:
+        if not slot_on_public_calendar(slot, today):
+            continue
         d = slot.starts_at.date()
-        if d not in days_map:
+        if d not in days_map or d < today:
             continue
         days_map[d].append(slot_to_out(db, slot))
 
@@ -188,6 +202,8 @@ def get_slot(slot_id: int, db: Session = Depends(get_db)):
         .first()
     )
     if not slot or slot.is_cancelled:
+        raise HTTPException(404, "Slot not found")
+    if not slot_on_public_calendar(slot, date.today()) or is_slot_departed(slot):
         raise HTTPException(404, "Slot not found")
 
     holds = pending_holds_for_slot(db, slot.id)

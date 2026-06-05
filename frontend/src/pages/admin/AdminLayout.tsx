@@ -1,4 +1,4 @@
-import { NavLink, Outlet, Link } from "react-router-dom";
+import { NavLink, Outlet } from "react-router-dom";
 import { useAdminAuth } from "../../admin/AdminAuth";
 
 const links = [
@@ -26,14 +26,18 @@ export default function AdminLayout() {
             </NavLink>
           ))}
         </nav>
-        <div style={{ padding: "1rem 1.25rem 0" }}>
-          <Link to="/" className="admin-btn admin-btn-sm" style={{ display: "block", textAlign: "center" }}>
+        <div className="admin-sidebar-footer">
+          <a
+            href="/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="admin-btn admin-btn-sm admin-sidebar-footer-btn"
+          >
             View calendar
-          </Link>
+          </a>
           <button
             type="button"
-            className="admin-btn admin-btn-sm"
-            style={{ width: "100%", marginTop: "0.5rem" }}
+            className="admin-btn admin-btn-sm admin-sidebar-footer-btn"
             onClick={logout}
           >
             Sign out
