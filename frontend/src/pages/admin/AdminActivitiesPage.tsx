@@ -7,7 +7,7 @@ import {
   type AdminTicketType,
 } from "../../admin/adminApi";
 import AdminModal from "../../admin/AdminModal";
-import { formatMoney } from "../../utils";
+import { formatDollarInput, formatMoney, parseDollarInput } from "../../utils";
 
 const emptyActivity = {
   title: "",
@@ -24,7 +24,7 @@ const emptyActivity = {
 const emptyTicket = {
   name: "",
   subtitle: "",
-  price_cents: 0,
+  price_dollars: "",
   sort_order: 0,
   max_per_booking: null as number | null,
 };
@@ -144,10 +144,16 @@ export default function AdminActivitiesPage() {
       setError("Save the tour first");
       return;
     }
+    const price_cents = parseDollarInput(ticketForm.price_dollars);
+    if (price_cents === null) {
+      setError("Enter a valid price (e.g. 55.55 or 0.55)");
+      return;
+    }
     const body = {
-      ...ticketForm,
+      name: ticketForm.name,
       subtitle: ticketForm.subtitle || null,
-      price_cents: Math.round(Number(ticketForm.price_cents)),
+      price_cents,
+      sort_order: ticketForm.sort_order,
       max_per_booking: ticketForm.max_per_booking || null,
     };
     try {
@@ -170,7 +176,7 @@ export default function AdminActivitiesPage() {
     setTicketForm({
       name: t.name,
       subtitle: t.subtitle || "",
-      price_cents: t.price_cents,
+      price_dollars: formatDollarInput(t.price_cents),
       sort_order: t.sort_order,
       max_per_booking: t.max_per_booking,
     });
@@ -395,16 +401,17 @@ export default function AdminActivitiesPage() {
                     />
                   </div>
                   <div className="admin-field">
-                    <label>Price (cents)</label>
+                    <label>Price ($)</label>
                     <input
-                      type="number"
-                      min={0}
-                      value={ticketForm.price_cents}
+                      type="text"
+                      inputMode="decimal"
+                      required
+                      value={ticketForm.price_dollars}
                       onChange={(e) =>
-                        setTicketForm({ ...ticketForm, price_cents: Number(e.target.value) })
+                        setTicketForm({ ...ticketForm, price_dollars: e.target.value })
                       }
+                      placeholder="55.55"
                     />
-                    <small>{formatMoney(ticketForm.price_cents)}</small>
                   </div>
                   <div className="admin-field full">
                     <label>Subtitle / notes</label>

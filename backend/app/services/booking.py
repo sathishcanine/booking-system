@@ -1,6 +1,9 @@
+import logging
 import secrets
 import string
 from datetime import datetime, timedelta
+
+import stripe
 
 from app.timeutil import utc_naive, utcnow
 
@@ -26,6 +29,8 @@ from app.services.availability import (
 )
 from app.services.pricing import apply_promo, calc_tax
 from app.services.promo import is_promo_exhausted
+
+logger = logging.getLogger(__name__)
 
 
 def _ref() -> str:
@@ -172,3 +177,24 @@ def create_booking(db: Session, payload: CreateBookingIn) -> Booking:
     db.commit()
     db.refresh(booking)
     return booking
+
+
+def release_booking_hold(db: Session, booking: Booking) -> bool:
+    """Free seats held by an unpaid checkout (customer left or edited booking)."""
+    if booking.status != BookingStatus.PENDING:
+        return False
+
+    if booking.stripe_payment_intent_id and settings.stripe_secret_key:
+        try:
+            intent = stripe.PaymentIntent.retrieve(booking.stripe_payment_intent_id)
+            if intent.status not in ("succeeded", "canceled"):
+                stripe.PaymentIntent.cancel(booking.stripe_payment_intent_id)
+        except Exception:
+            logger.exception(
+                "Could not cancel PaymentIntent for booking %s", booking.reference
+            )
+
+    booking.status = BookingStatus.EXPIRED
+    booking.hold_expires_at = None
+    db.commit()
+    return True

@@ -164,6 +164,20 @@ export async function createBooking(
   return data;
 }
 
+/** Release a pending seat hold (e.g. customer navigated away from checkout). */
+export async function releaseBookingHold(reference: string): Promise<void> {
+  const r = await fetch(
+    `${API}/api/bookings/${encodeURIComponent(reference)}/release`,
+    { method: "POST" }
+  );
+  if (!r.ok && r.status !== 404) {
+    const data = await r.json().catch(() => ({}));
+    const msg =
+      typeof data.detail === "string" ? data.detail : "Could not release seat hold";
+    throw new Error(msg);
+  }
+}
+
 export async function confirmBookingPayment(
   reference: string
 ): Promise<{ reference: string; status: string }> {

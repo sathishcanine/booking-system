@@ -11,6 +11,7 @@ import AdminActivitiesPage from "./pages/admin/AdminActivitiesPage";
 import AdminSlotsPage from "./pages/admin/AdminSlotsPage";
 import AdminPromosPage from "./pages/admin/AdminPromosPage";
 import AdminBookingsPage from "./pages/admin/AdminBookingsPage";
+import ToastHost from "./components/ToastHost";
 
 export default function App() {
   const { pathname } = useLocation();
@@ -19,6 +20,7 @@ export default function App() {
 
   return (
     <AdminAuthProvider>
+      <ToastHost />
       <div className={`app${isCalendar ? " app--calendar" : ""}${isAdmin ? " app--admin" : ""}`}>
         {!isCalendar && !isAdmin && <SiteHeader />}
         <main className={isCalendar ? "main main--calendar" : isAdmin ? "" : "main"}>

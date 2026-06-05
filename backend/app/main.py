@@ -41,7 +41,7 @@ from app.services.availability import (
     spots_left,
 )
 from app.timeutil import UTC
-from app.services.booking import create_booking, pending_holds_for_slot
+from app.services.booking import create_booking, pending_holds_for_slot, release_booking_hold
 from app.services.pricing import apply_promo
 from app.services.promo import is_promo_exhausted
 from app.routers import admin as admin_router
@@ -271,6 +271,18 @@ def post_booking(body: CreateBookingIn, db: Session = Depends(get_db)):
     if not summary.is_waitlist and summary.total_cents > 0 and summary.hold_seconds_remaining <= 0:
         raise HTTPException(409, "Seat hold expired before checkout could start. Please try again.")
     return summary
+
+
+@app.post("/api/bookings/{reference}/release")
+def release_booking(reference: str, db: Session = Depends(get_db)):
+    """Release seats when the customer leaves checkout before paying."""
+    booking = db.query(Booking).filter(Booking.reference == reference.upper()).first()
+    if not booking:
+        return {"ok": True}
+    if booking.status != BookingStatus.PENDING:
+        return {"ok": True, "status": booking.status.value}
+    release_booking_hold(db, booking)
+    return {"ok": True, "status": BookingStatus.EXPIRED.value}
 
 
 @app.post("/api/bookings/{reference}/confirm")

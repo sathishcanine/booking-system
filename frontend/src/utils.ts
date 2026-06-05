@@ -5,6 +5,21 @@ export function formatMoney(cents: number): string {
   }).format(cents / 100);
 }
 
+/** Format stored cents for a dollar amount input (e.g. 5555 → "55.55"). */
+export function formatDollarInput(cents: number): string {
+  if (!Number.isFinite(cents)) return "";
+  return (cents / 100).toFixed(2);
+}
+
+/** Parse a dollar string to integer cents; returns null when invalid. */
+export function parseDollarInput(value: string): number | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const dollars = Number(trimmed);
+  if (!Number.isFinite(dollars) || dollars < 0) return null;
+  return Math.round(dollars * 100);
+}
+
 /** 24h style: 09:00, 19:00 */
 export function formatTime(iso: string): string {
   const d = new Date(iso);

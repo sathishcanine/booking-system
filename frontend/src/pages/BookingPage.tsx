@@ -6,6 +6,7 @@ import {
   createBooking,
   fetchConfig,
   fetchSlot,
+  releaseBookingHold,
   validatePromo,
   type AppConfig,
   type SlotDetail,
@@ -13,6 +14,7 @@ import {
 import CheckoutForm from "../components/CheckoutForm";
 import HoldCountdown from "../components/HoldCountdown";
 import OrderSummary from "../components/OrderSummary";
+import { showToast } from "../toast";
 import { formatDateTime, formatMoney, formatSlotRange } from "../utils";
 
 type QtyMap = Record<number, number>;
@@ -35,8 +37,8 @@ export default function BookingPage() {
   const [holdExpiresAt, setHoldExpiresAt] = useState<string | null>(null);
   const [holdSecondsRemaining, setHoldSecondsRemaining] = useState(0);
   const [checkoutActive, setCheckoutActive] = useState(false);
-  const [holdNotice, setHoldNotice] = useState<string | null>(null);
   const checkoutSessionRef = useRef(0);
+  const activeHoldRef = useRef<string | null>(null);
 
   const [form, setForm] = useState({
     name: "",
@@ -50,20 +52,35 @@ export default function BookingPage() {
     ack_route: false,
   });
 
+  const releaseActiveHold = useCallback(() => {
+    const ref = activeHoldRef.current;
+    if (!ref) return;
+    activeHoldRef.current = null;
+    void releaseBookingHold(ref).catch(() => {
+      /* best-effort — hold also expires server-side */
+    });
+  }, []);
+
   const resetCheckout = useCallback(() => {
+    releaseActiveHold();
     setClientSecret(null);
     setHoldExpiresAt(null);
     setHoldSecondsRemaining(0);
     setBookingRef("");
     setCheckoutActive(false);
     checkoutSessionRef.current += 1;
-  }, []);
+  }, [releaseActiveHold]);
+
+  useEffect(() => {
+    return () => {
+      releaseActiveHold();
+    };
+  }, [releaseActiveHold]);
 
   useEffect(() => {
     const id = Number(slotId);
     if (!id) return;
     resetCheckout();
-    setHoldNotice(null);
     setError("");
     Promise.all([fetchSlot(id), fetchConfig()])
       .then(([s, c]) => {
@@ -136,7 +153,6 @@ export default function BookingPage() {
     e.preventDefault();
     if (!slot) return;
     setError("");
-    setHoldNotice(null);
     setSubmitting(true);
     try {
       const lines = Object.entries(qty)
@@ -163,6 +179,7 @@ export default function BookingPage() {
       });
 
       if (summary.is_waitlist || !summary.client_secret) {
+        activeHoldRef.current = null;
         navigate(`/success/${summary.reference}?waitlist=1`);
         return;
       }
@@ -172,6 +189,7 @@ export default function BookingPage() {
       }
 
       checkoutSessionRef.current += 1;
+      activeHoldRef.current = summary.reference;
       setBookingRef(summary.reference);
       setClientSecret(summary.client_secret);
       setPublishableKey(summary.publishable_key);
@@ -191,11 +209,18 @@ export default function BookingPage() {
   );
 
   const handleHoldExpired = useCallback(() => {
-    setHoldNotice(
-      "Your seat hold expired. Click Continue to payment to reserve these seats again."
+    activeHoldRef.current = null;
+    setClientSecret(null);
+    setHoldExpiresAt(null);
+    setHoldSecondsRemaining(0);
+    setBookingRef("");
+    setCheckoutActive(false);
+    checkoutSessionRef.current += 1;
+    showToast(
+      "Your seat hold expired. Please choose your trip again on the calendar to reserve seats."
     );
-    resetCheckout();
-  }, [resetCheckout]);
+    navigate("/", { replace: true });
+  }, [navigate]);
 
   const onCheckoutHoldExpired = useCallback(() => {
     if (!checkoutActive) return;
@@ -263,11 +288,6 @@ export default function BookingPage() {
 
         {!showPayment && !isBookingClosed ? (
           <form className="booking-form" onSubmit={onSubmit}>
-            {holdNotice && (
-              <p className="hold-notice" role="status">
-                {holdNotice}
-              </p>
-            )}
             <h2>Plan your experience</h2>
             {!isWaitlistTrip && maxSelectable > 0 && (
               <p className="ticket-cap-hint">
@@ -455,10 +475,7 @@ export default function BookingPage() {
               <button
                 type="button"
                 className="btn-text edit-booking-btn"
-                onClick={() => {
-                  resetCheckout();
-                  setHoldNotice(null);
-                }}
+                onClick={() => resetCheckout()}
               >
                 ← Edit booking
               </button>
@@ -466,7 +483,10 @@ export default function BookingPage() {
                 <CheckoutForm
                   email={form.email}
                   reference={bookingRef}
-                  onSuccess={(ref) => navigate(`/success/${ref}`)}
+                  onSuccess={(ref) => {
+                    activeHoldRef.current = null;
+                    navigate(`/success/${ref}`);
+                  }}
                 />
               </Elements>
             </>
