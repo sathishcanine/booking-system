@@ -1,4 +1,5 @@
 import type { SlotDetail } from "../api";
+import HoldCountdown from "./HoldCountdown";
 import { formatMoney, formatSlotRange } from "../utils";
 
 type Props = {
@@ -9,6 +10,8 @@ type Props = {
   tax: number;
   total: number;
   taxRate: number;
+  holdExpiresAt?: string | null;
+  holdSecondsRemaining?: number;
 };
 
 export default function OrderSummary({
@@ -19,9 +22,19 @@ export default function OrderSummary({
   tax,
   total,
   taxRate,
+  holdExpiresAt,
+  holdSecondsRemaining,
 }: Props) {
   return (
     <div className="order-summary card">
+      {holdExpiresAt && holdSecondsRemaining !== undefined && (
+        <HoldCountdown
+          expiresAt={holdExpiresAt}
+          initialSeconds={holdSecondsRemaining}
+          compact
+          displayOnly
+        />
+      )}
       <h3>Summary</h3>
       <p className="summary-title">{slot.title}</p>
       <p className="summary-meta">{formatSlotRange(slot.starts_at, slot.ends_at)}</p>

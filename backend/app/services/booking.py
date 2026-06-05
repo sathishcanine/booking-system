@@ -2,7 +2,7 @@ import secrets
 import string
 from datetime import datetime, timedelta
 
-from app.timeutil import utcnow
+from app.timeutil import utc_naive, utcnow
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
@@ -35,7 +35,7 @@ def _ref() -> str:
 
 def pending_holds_for_slot(db: Session, slot_id: int) -> int:
     """Seats held by unpaid bookings that haven't expired."""
-    now = utcnow()
+    now = utc_naive(utcnow())
     rows = (
         db.query(func.coalesce(func.sum(BookingItem.quantity), 0))
         .join(Booking)
@@ -132,7 +132,7 @@ def create_booking(db: Session, payload: CreateBookingIn) -> Booking:
     total = after_discount + tax
 
     is_waitlist = left <= 0 and payload.join_waitlist
-    hold_until = utcnow() + timedelta(minutes=settings.booking_hold_minutes)
+    hold_until = utc_naive(utcnow() + timedelta(minutes=settings.booking_hold_minutes))
 
     booking = Booking(
         reference=_ref(),
@@ -154,7 +154,7 @@ def create_booking(db: Session, payload: CreateBookingIn) -> Booking:
         comments=payload.comments,
         ack_public_trip=payload.ack_public_trip,
         ack_route=payload.ack_route,
-        created_at=utcnow(),
+        created_at=utc_naive(utcnow()),
     )
     db.add(booking)
     db.flush()

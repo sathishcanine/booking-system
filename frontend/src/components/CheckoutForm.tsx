@@ -4,6 +4,7 @@ import {
   useStripe,
 } from "@stripe/react-stripe-js";
 import { FormEvent, useState } from "react";
+import { confirmBookingPayment } from "../api";
 
 type Props = {
   email: string;
@@ -47,7 +48,16 @@ export default function CheckoutForm({ email, reference, onSuccess }: Props) {
     }
 
     if (paymentIntent?.status === "succeeded") {
-      onSuccess(reference);
+      try {
+        await confirmBookingPayment(reference);
+        onSuccess(reference);
+      } catch (err) {
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Payment received but confirmation failed — contact us with your reference."
+        );
+      }
     }
     setLoading(false);
   }

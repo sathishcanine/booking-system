@@ -77,6 +77,7 @@ export type AppConfig = {
   tax_rate_percent: number;
   site_timezone: string;
   default_booking_cutoff_hours: number;
+  booking_hold_minutes: number;
 };
 
 export type BookingSummary = {
@@ -90,6 +91,7 @@ export type BookingSummary = {
   publishable_key: string;
   is_waitlist: boolean;
   hold_expires_at: string | null;
+  hold_seconds_remaining: number;
 };
 
 export async function fetchConfig(): Promise<AppConfig> {
@@ -158,6 +160,20 @@ export async function createBooking(
           ? data.detail[0]?.msg
           : "Booking failed";
     throw new Error(msg || "Booking failed");
+  }
+  return data;
+}
+
+export async function confirmBookingPayment(
+  reference: string
+): Promise<{ reference: string; status: string }> {
+  const r = await fetch(`${API}/api/bookings/${encodeURIComponent(reference)}/confirm`, {
+    method: "POST",
+  });
+  const data = await r.json();
+  if (!r.ok) {
+    const msg = typeof data.detail === "string" ? data.detail : "Payment confirmation failed";
+    throw new Error(msg);
   }
   return data;
 }

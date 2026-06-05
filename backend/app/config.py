@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     stripe_publishable_key: str = ""
     frontend_url: str = "http://localhost:5173"
     tax_rate_percent: float = 13.0
-    booking_hold_minutes: int = 15
+    booking_hold_minutes: int = 3
     default_booking_cutoff_hours: int = 2
     site_timezone: str = "America/New_York"
     admin_password: str = "changeme"

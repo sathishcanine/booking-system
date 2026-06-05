@@ -107,9 +107,33 @@ export default function AdminSlotsPage() {
     return Number(form.booking_cutoff_hours);
   }
 
+  function validateSlotForm(): string | null {
+    if (!form.starts_at || !form.ends_at) return "Start and end times are required.";
+    const starts = new Date(form.starts_at);
+    const ends = new Date(form.ends_at);
+    if (Number.isNaN(starts.getTime()) || Number.isNaN(ends.getTime())) {
+      return "Invalid start or end time.";
+    }
+    if (ends <= starts) return "End time must be after start time.";
+    if (form.capacity < 1) return "Capacity must be at least 1.";
+    if (form.capacity > 500) return "Capacity cannot exceed 500.";
+    if (
+      form.booking_cutoff_hours !== "" &&
+      (form.booking_cutoff_hours < 0 || form.booking_cutoff_hours > 168)
+    ) {
+      return "Booking cutoff must be between 0 and 168 hours.";
+    }
+    return null;
+  }
+
   async function saveSlot(e: FormEvent) {
     e.preventDefault();
     setError("");
+    const validationError = validateSlotForm();
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
     const body = {
       activity_id: form.activity_id,
       starts_at: new Date(form.starts_at).toISOString(),
@@ -142,6 +166,11 @@ export default function AdminSlotsPage() {
   async function bulkCreate(e: FormEvent) {
     e.preventDefault();
     if (!form.activity_id) return;
+    const validationError = validateSlotForm();
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
     const dates = bulkDates
       .split(/[\n,]+/)
       .map((d) => d.trim())
@@ -337,9 +366,11 @@ export default function AdminSlotsPage() {
                 <input
                   type="number"
                   min={1}
+                  max={500}
                   value={form.capacity}
                   onChange={(e) => setForm({ ...form, capacity: Number(e.target.value) })}
                 />
+                <small>Maximum 500 per departure.</small>
               </div>
               <div className="admin-field">
                 <label>Stop online booking (hours before)</label>

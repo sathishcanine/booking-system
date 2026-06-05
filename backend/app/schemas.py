@@ -114,6 +114,7 @@ class BookingSummaryOut(BaseModel):
     publishable_key: str
     is_waitlist: bool
     hold_expires_at: datetime | None
+    hold_seconds_remaining: int = 0
 
 
 class PromoValidateIn(BaseModel):
@@ -132,3 +133,4 @@ class ConfigOut(BaseModel):
     tax_rate_percent: float
     site_timezone: str
     default_booking_cutoff_hours: int
+    booking_hold_minutes: int

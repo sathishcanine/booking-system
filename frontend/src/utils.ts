@@ -13,8 +13,21 @@ export function formatTime(iso: string): string {
   return `${h}:${m}`;
 }
 
+/** Parse API UTC timestamps (with or without Z / offset). */
+export function parseUtcMs(iso: string): number {
+  if (!iso) return 0;
+  const hasZone = /[zZ]|[+-]\d{2}:\d{2}$/.test(iso);
+  const normalized = hasZone ? iso : `${iso}Z`;
+  return new Date(normalized).getTime();
+}
+
+export function secondsUntilUtc(iso: string): number {
+  const ms = parseUtcMs(iso) - Date.now();
+  return Math.max(0, Math.floor(ms / 1000));
+}
+
 export function formatDateTime(iso: string): string {
-  return new Date(iso).toLocaleString("en-US", {
+  return new Date(parseUtcMs(iso)).toLocaleString("en-US", {
     weekday: "short",
     month: "short",
     day: "numeric",

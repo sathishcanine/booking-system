@@ -1,6 +1,6 @@
 import { Elements } from "@stripe/react-stripe-js";
 import { loadStripe } from "@stripe/stripe-js";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   createBooking,
@@ -11,6 +11,7 @@ import {
   type SlotDetail,
 } from "../api";
 import CheckoutForm from "../components/CheckoutForm";
+import HoldCountdown from "../components/HoldCountdown";
 import OrderSummary from "../components/OrderSummary";
 import { formatDateTime, formatMoney, formatSlotRange } from "../utils";
 
@@ -31,6 +32,11 @@ export default function BookingPage() {
   const [publishableKey, setPublishableKey] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [joinWaitlist, setJoinWaitlist] = useState(false);
+  const [holdExpiresAt, setHoldExpiresAt] = useState<string | null>(null);
+  const [holdSecondsRemaining, setHoldSecondsRemaining] = useState(0);
+  const [checkoutActive, setCheckoutActive] = useState(false);
+  const [holdNotice, setHoldNotice] = useState<string | null>(null);
+  const checkoutSessionRef = useRef(0);
 
   const [form, setForm] = useState({
     name: "",
@@ -44,9 +50,21 @@ export default function BookingPage() {
     ack_route: false,
   });
 
+  const resetCheckout = useCallback(() => {
+    setClientSecret(null);
+    setHoldExpiresAt(null);
+    setHoldSecondsRemaining(0);
+    setBookingRef("");
+    setCheckoutActive(false);
+    checkoutSessionRef.current += 1;
+  }, []);
+
   useEffect(() => {
     const id = Number(slotId);
     if (!id) return;
+    resetCheckout();
+    setHoldNotice(null);
+    setError("");
     Promise.all([fetchSlot(id), fetchConfig()])
       .then(([s, c]) => {
         setSlot(s);
@@ -60,7 +78,7 @@ export default function BookingPage() {
         setQty(initial);
       })
       .catch(() => setError("This departure is unavailable."));
-  }, [slotId]);
+  }, [slotId, resetCheckout]);
 
   const totalTickets = useMemo(
     () => Object.values(qty).reduce((a, b) => a + b, 0),
@@ -118,6 +136,7 @@ export default function BookingPage() {
     e.preventDefault();
     if (!slot) return;
     setError("");
+    setHoldNotice(null);
     setSubmitting(true);
     try {
       const lines = Object.entries(qty)
@@ -148,9 +167,17 @@ export default function BookingPage() {
         return;
       }
 
+      if (!summary.hold_expires_at || summary.hold_seconds_remaining <= 0) {
+        throw new Error("Could not reserve seats in time. Please try again.");
+      }
+
+      checkoutSessionRef.current += 1;
       setBookingRef(summary.reference);
       setClientSecret(summary.client_secret);
       setPublishableKey(summary.publishable_key);
+      setHoldExpiresAt(summary.hold_expires_at);
+      setHoldSecondsRemaining(summary.hold_seconds_remaining);
+      setCheckoutActive(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Booking failed");
     } finally {
@@ -163,10 +190,28 @@ export default function BookingPage() {
     [publishableKey]
   );
 
+  const handleHoldExpired = useCallback(() => {
+    setHoldNotice(
+      "Your seat hold expired. Click Continue to payment to reserve these seats again."
+    );
+    resetCheckout();
+  }, [resetCheckout]);
+
+  const onCheckoutHoldExpired = useCallback(() => {
+    if (!checkoutActive) return;
+    handleHoldExpired();
+  }, [checkoutActive, handleHoldExpired]);
+
   if (error && !slot) return <p className="error">{error}</p>;
   if (!slot) return <p className="loading">Loading…</p>;
 
-  const showPayment = Boolean(clientSecret && stripePromise);
+  const showPayment = Boolean(
+    checkoutActive &&
+      clientSecret &&
+      stripePromise &&
+      holdExpiresAt &&
+      holdSecondsRemaining > 0
+  );
 
   return (
     <div className="booking-layout">
@@ -218,6 +263,11 @@ export default function BookingPage() {
 
         {!showPayment && !isBookingClosed ? (
           <form className="booking-form" onSubmit={onSubmit}>
+            {holdNotice && (
+              <p className="hold-notice" role="status">
+                {holdNotice}
+              </p>
+            )}
             <h2>Plan your experience</h2>
             {!isWaitlistTrip && maxSelectable > 0 && (
               <p className="ticket-cap-hint">
@@ -393,14 +443,33 @@ export default function BookingPage() {
           </form>
         ) : (
           stripePromise &&
-          clientSecret && (
-            <Elements stripe={stripePromise} options={{ clientSecret }}>
-              <CheckoutForm
-                email={form.email}
-                reference={bookingRef}
-                onSuccess={(ref) => navigate(`/success/${ref}`)}
+          clientSecret &&
+          holdExpiresAt && (
+            <>
+              <HoldCountdown
+                key={checkoutSessionRef.current}
+                expiresAt={holdExpiresAt}
+                initialSeconds={holdSecondsRemaining}
+                onExpired={onCheckoutHoldExpired}
               />
-            </Elements>
+              <button
+                type="button"
+                className="btn-text edit-booking-btn"
+                onClick={() => {
+                  resetCheckout();
+                  setHoldNotice(null);
+                }}
+              >
+                ← Edit booking
+              </button>
+              <Elements stripe={stripePromise} options={{ clientSecret }}>
+                <CheckoutForm
+                  email={form.email}
+                  reference={bookingRef}
+                  onSuccess={(ref) => navigate(`/success/${ref}`)}
+                />
+              </Elements>
+            </>
           )
         )}
       </div>
@@ -414,6 +483,8 @@ export default function BookingPage() {
           tax={tax}
           total={total}
           taxRate={config?.tax_rate_percent ?? 13}
+          holdExpiresAt={showPayment ? holdExpiresAt : null}
+          holdSecondsRemaining={showPayment ? holdSecondsRemaining : undefined}
         />
       </aside>
     </div>

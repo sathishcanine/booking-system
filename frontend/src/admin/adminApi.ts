@@ -13,6 +13,27 @@ export function clearAdminToken() {
   localStorage.removeItem(TOKEN_KEY);
 }
 
+function formatApiError(data: unknown, status: number): string {
+  if (!data || typeof data !== "object") return `Request failed (${status})`;
+  const d = data as { detail?: unknown; message?: string };
+  if (typeof d.detail === "string") return d.detail;
+  if (Array.isArray(d.detail)) {
+    const parts = d.detail
+      .map((item) => {
+        if (!item || typeof item !== "object") return null;
+        const e = item as { loc?: unknown[]; msg?: string };
+        const field = Array.isArray(e.loc)
+          ? e.loc.filter((x) => typeof x === "string" && x !== "body").join(".")
+          : "";
+        return field && e.msg ? `${field}: ${e.msg}` : e.msg || null;
+      })
+      .filter(Boolean);
+    if (parts.length) return parts.join("; ");
+  }
+  if (d.message) return d.message;
+  return `Request failed (${status})`;
+}
+
 async function adminFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
   const token = getAdminToken();
   const headers: Record<string, string> = {
@@ -29,11 +50,7 @@ async function adminFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
   }
   const data = await r.json().catch(() => ({}));
   if (!r.ok) {
-    const msg =
-      typeof data.detail === "string"
-        ? data.detail
-        : data.message || `Request failed (${r.status})`;
-    throw new Error(msg);
+    throw new Error(formatApiError(data, r.status));
   }
   return data as T;
 }

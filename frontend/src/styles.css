@@ -141,6 +141,74 @@ a {
   color: #721c24;
 }
 
+.hold-countdown {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+  border-radius: var(--radius);
+  background: #fff8e6;
+  border: 1px solid #f0d78c;
+  color: #7a5b00;
+  font-size: 0.9rem;
+}
+
+.hold-countdown strong {
+  font-size: 1rem;
+  color: #5c4500;
+}
+
+.hold-countdown--urgent {
+  background: #fff0f0;
+  border-color: #f5b8b8;
+  color: #8b1a1a;
+}
+
+.hold-countdown--urgent strong {
+  color: #721c24;
+}
+
+.hold-countdown--expired {
+  background: #f8d7da;
+  border-color: #f1aeb5;
+  color: #721c24;
+}
+
+.order-summary .hold-countdown {
+  margin-bottom: 0.75rem;
+  padding: 0.6rem 0.75rem;
+  font-size: 0.85rem;
+}
+
+.order-summary .hold-countdown strong {
+  font-size: 0.95rem;
+}
+
+.hold-notice {
+  margin: 0 0 1rem;
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius);
+  background: #fff8e6;
+  border: 1px solid #f0d78c;
+  color: #7a5b00;
+  font-size: 0.9rem;
+}
+
+.edit-booking-btn {
+  margin-bottom: 0.75rem;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--blue);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.edit-booking-btn:hover {
+  text-decoration: underline;
+}
+
 .slot-card-img {
   width: 100%;
   height: 72px;

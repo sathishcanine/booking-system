@@ -42,20 +42,47 @@ from app.services.stripe_service import attach_payment_intent, confirm_booking_p
 logger = logging.getLogger(__name__)
 
 
+def _booking_summary(booking: Booking, client_secret: str | None) -> BookingSummaryOut:
+    from app.timeutil import as_utc, hold_seconds_remaining
+
+    return BookingSummaryOut(
+        booking_id=booking.id,
+        reference=booking.reference,
+        subtotal_cents=booking.subtotal_cents,
+        discount_cents=booking.discount_cents,
+        tax_cents=booking.tax_cents,
+        total_cents=booking.total_cents,
+        client_secret=client_secret,
+        publishable_key=settings.stripe_publishable_key,
+        is_waitlist=booking.is_waitlist,
+        hold_expires_at=as_utc(booking.hold_expires_at),
+        hold_seconds_remaining=hold_seconds_remaining(booking.hold_expires_at),
+    )
+
+
 def expire_stale_holds(db: Session):
-    from app.timeutil import utcnow
+    from app.timeutil import utc_naive, utcnow
 
     stale = (
         db.query(Booking)
         .filter(
             Booking.status == BookingStatus.PENDING,
-            Booking.hold_expires_at < utcnow(),
+            Booking.hold_expires_at < utc_naive(utcnow()),
         )
         .all()
     )
     if not stale:
         return
     for b in stale:
+        if b.stripe_payment_intent_id and settings.stripe_secret_key:
+            try:
+                intent = stripe.PaymentIntent.retrieve(b.stripe_payment_intent_id)
+                if intent.status == "succeeded" and confirm_booking_paid(
+                    db, b.id, intent.id
+                ):
+                    continue
+            except Exception:
+                logger.exception("Stripe check failed for booking %s", b.reference)
         b.status = BookingStatus.EXPIRED
     try:
         db.commit()
@@ -90,6 +117,7 @@ def get_config():
         tax_rate_percent=settings.tax_rate_percent,
         site_timezone=settings.site_timezone,
         default_booking_cutoff_hours=settings.default_booking_cutoff_hours,
+        booking_hold_minutes=settings.booking_hold_minutes,
     )
 
 
@@ -221,18 +249,39 @@ def post_booking(body: CreateBookingIn, db: Session = Depends(get_db)):
         if not booking.is_waitlist:
             raise HTTPException(502, "Payment setup failed") from None
 
-    return BookingSummaryOut(
-        booking_id=booking.id,
-        reference=booking.reference,
-        subtotal_cents=booking.subtotal_cents,
-        discount_cents=booking.discount_cents,
-        tax_cents=booking.tax_cents,
-        total_cents=booking.total_cents,
-        client_secret=client_secret,
-        publishable_key=settings.stripe_publishable_key,
-        is_waitlist=booking.is_waitlist,
-        hold_expires_at=booking.hold_expires_at,
-    )
+    summary = _booking_summary(booking, client_secret)
+    if not summary.is_waitlist and summary.total_cents > 0 and summary.hold_seconds_remaining <= 0:
+        raise HTTPException(409, "Seat hold expired before checkout could start. Please try again.")
+    return summary
+
+
+@app.post("/api/bookings/{reference}/confirm")
+def confirm_booking_payment(reference: str, db: Session = Depends(get_db)):
+    """Mark booking paid after Stripe succeeds (webhook backup for local dev)."""
+    if not settings.stripe_secret_key:
+        raise HTTPException(503, "Payments not configured")
+
+    booking = db.query(Booking).filter(Booking.reference == reference.upper()).first()
+    if not booking:
+        raise HTTPException(404, "Booking not found")
+    if booking.status == BookingStatus.PAID:
+        return {"reference": booking.reference, "status": "paid"}
+    if booking.status != BookingStatus.PENDING:
+        raise HTTPException(409, f"Booking is {booking.status.value}")
+    if not booking.stripe_payment_intent_id:
+        raise HTTPException(400, "No payment in progress for this booking")
+
+    intent = stripe.PaymentIntent.retrieve(booking.stripe_payment_intent_id)
+    if intent.status != "succeeded":
+        raise HTTPException(402, "Payment not completed yet")
+
+    if not confirm_booking_paid(db, booking.id, intent.id):
+        db.refresh(booking)
+        if booking.status == BookingStatus.PAID:
+            return {"reference": booking.reference, "status": "paid"}
+        raise HTTPException(409, "Could not confirm booking — contact support with your reference")
+
+    return {"reference": booking.reference, "status": "paid"}
 
 
 @app.get("/api/bookings/{reference}")
