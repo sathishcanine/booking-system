@@ -21,7 +21,7 @@ SLOT_TEMPLATES = [
     ("egmont", 9, 30, 18, "Full-day Egmont Key adventure.", "image", None, None, None),
     ("float_party", 11, 0, 22, "Family float party at Shell Key.", "image", None, "Almost Sold Out!", None),
     ("booze", 19, 30, 16, "Evening booze cruise — 21+ only.", None, None, None, None),
-    ("sunset", 7, 0, 24, "Early bird sunset dolphin tour.", None, None, "7 spots left", None),
+    ("sunset", 7, 0, 24, "Early bird sunset dolphin tour.", None, None, None, None),
 ]
 
 def _ensure_slot_columns():

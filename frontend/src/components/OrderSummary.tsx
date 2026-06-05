@@ -25,6 +25,11 @@ export default function OrderSummary({
       <h3>Summary</h3>
       <p className="summary-title">{slot.title}</p>
       <p className="summary-meta">{formatSlotRange(slot.starts_at, slot.ends_at)}</p>
+      {slot.status !== "waitlist" && slot.spots_left > 0 && (
+        <p className="summary-availability">
+          {slot.spots_left} {slot.spots_left === 1 ? "spot" : "spots"} left
+        </p>
+      )}
       <ul className="summary-lines">
         {slot.ticket_types.map((t) => {
           const q = qty[t.id] || 0;

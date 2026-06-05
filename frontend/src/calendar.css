@@ -243,6 +243,11 @@
   color: var(--orange);
 }
 
+.slot-urgency--muted {
+  color: var(--muted);
+  font-weight: 600;
+}
+
 .slot-waitlist-btn {
   display: inline-block;
   margin-top: 0.25rem;

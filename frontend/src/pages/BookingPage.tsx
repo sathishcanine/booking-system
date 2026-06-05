@@ -84,14 +84,21 @@ export default function BookingPage() {
   const total = Math.max(0, subtotal - promoDiscount) + tax;
 
   const maxSelectable = slot?.max_tickets_per_booking ?? 0;
+  const isWaitlistTrip = slot?.status === "waitlist";
+
+  function maxForTicket(ticketId: number): number {
+    if (!slot || isWaitlistTrip) return 20;
+    const tt = slot.ticket_types.find((t) => t.id === ticketId);
+    const otherTotal = totalTickets - (qty[ticketId] ?? 0);
+    const remainingForBooking = Math.max(0, maxSelectable - otherTotal);
+    const perType = tt?.max_per_booking ?? remainingForBooking;
+    return Math.max(0, Math.min(perType, remainingForBooking));
+  }
 
   function setQuantity(ticketId: number, value: number) {
     if (!slot) return;
-    const tt = slot.ticket_types.find((t) => t.id === ticketId);
-    const cap = tt?.max_per_booking ?? maxSelectable;
+    const cap = maxForTicket(ticketId);
     const next = { ...qty, [ticketId]: Math.min(Math.max(0, value), cap) };
-    const newTotal = Object.values(next).reduce((a, b) => a + b, 0);
-    if (newTotal > maxSelectable && slot.status !== "waitlist") return;
     setQty(next);
   }
 
@@ -174,18 +181,33 @@ export default function BookingPage() {
               {slot.description}
               {slot.emoji && ` ${slot.emoji}`}
             </p>
-            {slot.status === "low" && (
-              <p className="urgency">{slot.spots_left} spots left — book soon!</p>
-            )}
-            {slot.status === "waitlist" && (
+            {isWaitlistTrip ? (
               <p className="urgency waitlist">This trip is full — join the waitlist.</p>
-            )}
+            ) : slot.spots_left > 0 ? (
+              <p className={`urgency${slot.status === "low" ? "" : " availability"}`}>
+                {slot.spots_left} {slot.spots_left === 1 ? "spot" : "spots"} left
+                {slot.status === "low" ? " — book soon!" : ""}
+              </p>
+            ) : null}
           </div>
         </section>
 
         {!showPayment ? (
           <form className="booking-form" onSubmit={onSubmit}>
             <h2>Plan your experience</h2>
+            {!isWaitlistTrip && maxSelectable > 0 && (
+              <p className="ticket-cap-hint">
+                You can book up to {maxSelectable}{" "}
+                {maxSelectable === 1 ? "seat" : "seats"} on this departure
+                {totalTickets > 0 && (
+                  <>
+                    {" "}
+                    ({maxSelectable - totalTickets} remaining in this order)
+                  </>
+                )}
+                .
+              </p>
+            )}
             {slot.ticket_types.map((t) => (
               <div className="ticket-row" key={t.id}>
                 <select
@@ -193,14 +215,11 @@ export default function BookingPage() {
                   onChange={(e) => setQuantity(t.id, Number(e.target.value))}
                   className="qty-select"
                 >
-                  {Array.from(
-                    { length: (t.max_per_booking ?? maxSelectable) + 1 },
-                    (_, i) => (
-                      <option key={i} value={i}>
-                        {i}
-                      </option>
-                    )
-                  )}
+                  {Array.from({ length: maxForTicket(t.id) + 1 }, (_, i) => (
+                    <option key={i} value={i}>
+                      {i}
+                    </option>
+                  ))}
                 </select>
                 <div className="ticket-label">
                   <strong>{t.name}</strong>
