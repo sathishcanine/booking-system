@@ -8,6 +8,7 @@ export default function SlotCard({ slot, compact }: Props) {
   const isWaitlist = slot.status === "waitlist";
   const isLow = slot.status === "low";
   const isCall = slot.is_call_to_book;
+  const isClosed = slot.booking_closed && !isCall;
   // Ignore static marketing copy like "7 spots left" — calendar must match live inventory.
   const marketingUrgency =
     slot.urgency_text && !/\d+\s+spots?\s+left/i.test(slot.urgency_text)
@@ -40,12 +41,15 @@ export default function SlotCard({ slot, compact }: Props) {
         {marketingUrgency && (
           <p className="slot-urgency">{marketingUrgency}</p>
         )}
-        {!isWaitlist && slot.spots_left > 0 && (
+        {isClosed && (
+          <p className="slot-urgency slot-urgency--closed">Online booking closed</p>
+        )}
+        {!isClosed && !isWaitlist && slot.spots_left > 0 && (
           <p className={`slot-urgency${isLow ? "" : " slot-urgency--muted"}`}>
             {slot.spots_left} {slot.spots_left === 1 ? "spot" : "spots"} left
           </p>
         )}
-        {isWaitlist && <span className="slot-waitlist-btn">Waitlist</span>}
+        {!isClosed && isWaitlist && <span className="slot-waitlist-btn">Waitlist</span>}
         {isCall && <span className="slot-call-book">Call to book</span>}
       </div>
     </>
@@ -64,6 +68,14 @@ export default function SlotCard({ slot, compact }: Props) {
 
   if (isCall) {
     return <div className="slot-card slot-card--call">{inner}</div>;
+  }
+
+  if (isClosed) {
+    return (
+      <div className={`slot-card slot-card--closed${compact ? " slot-card--compact" : ""}`}>
+        {inner}
+      </div>
+    );
   }
 
   return (

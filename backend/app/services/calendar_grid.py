@@ -3,9 +3,9 @@ from datetime import date, datetime, timedelta
 
 from sqlalchemy.orm import Session, joinedload
 
-from app.models import Slot
+from app.models import Slot, SlotStatus
 from app.schemas import CalendarCellOut, CalendarMonthOut, CalendarSlotOut
-from app.services.availability import slot_status
+from app.services.availability import booking_deadline, effective_cutoff_hours, slot_status
 from app.services.booking import pending_holds_for_slot
 
 
@@ -49,6 +49,9 @@ def slot_to_out(db: Session, slot: Slot) -> CalendarSlotOut:
         call_phone=slot.call_phone,
         brand_label=slot.brand_label,
         urgency_text=slot.urgency_text,
+        booking_cutoff_hours=effective_cutoff_hours(slot),
+        booking_deadline=booking_deadline(slot),
+        booking_closed=st == SlotStatus.CLOSED,
     )
 
 

@@ -71,6 +71,12 @@ class AdminSlotIn(BaseModel):
     call_phone: str | None = None
     brand_label: str | None = None
     urgency_text: str | None = None
+    booking_cutoff_hours: int | None = Field(
+        default=None,
+        ge=0,
+        le=168,
+        description="Hours before departure to stop online booking; null uses site default",
+    )
 
 
 class AdminSlotOut(AdminSlotIn):
@@ -238,3 +244,4 @@ class AdminBulkSlotsIn(BaseModel):
     call_phone: str | None = None
     brand_label: str | None = None
     urgency_text: str | None = None
+    booking_cutoff_hours: int | None = Field(default=None, ge=0, le=168)

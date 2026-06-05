@@ -169,6 +169,7 @@ export type AdminSlot = {
   urgency_text: string | null;
   is_cancelled: boolean;
   activity_title: string | null;
+  booking_cutoff_hours: number | null;
 };
 
 export type AdminPromo = {

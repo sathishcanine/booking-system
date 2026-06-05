@@ -31,6 +31,9 @@ class CalendarSlotOut(BaseModel):
     call_phone: str | None = None
     brand_label: str | None = None
     urgency_text: str | None = None
+    booking_cutoff_hours: int
+    booking_deadline: datetime
+    booking_closed: bool
 
 
 class CalendarCellOut(BaseModel):
@@ -74,6 +77,9 @@ class SlotDetailOut(BaseModel):
     meeting_instructions: str | None
     ticket_types: list[TicketTypeOut]
     max_tickets_per_booking: int
+    booking_cutoff_hours: int
+    booking_deadline: datetime
+    booking_closed: bool
 
 
 class BookingLineIn(BaseModel):
@@ -125,3 +131,4 @@ class ConfigOut(BaseModel):
     publishable_key: str
     tax_rate_percent: float
     site_timezone: str
+    default_booking_cutoff_hours: int

@@ -123,6 +123,24 @@ a {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
 }
 
+.slot-card--closed {
+  opacity: 0.72;
+  cursor: not-allowed;
+}
+
+.slot-card--closed:hover {
+  box-shadow: none;
+}
+
+.slot-urgency--closed {
+  color: #721c24;
+  font-weight: 600;
+}
+
+.booking-closed {
+  color: #721c24;
+}
+
 .slot-card-img {
   width: 100%;
   height: 72px;

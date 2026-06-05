@@ -1,5 +1,6 @@
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { fetchConfig } from "../../api";
 import AdminModal from "../../admin/AdminModal";
 import { admin, type AdminActivityListItem, type AdminSlot } from "../../admin/adminApi";
 import { formatTime } from "../../utils";
@@ -23,6 +24,7 @@ const emptySlot = {
   call_phone: "+1-727-380-0431",
   brand_label: "",
   urgency_text: "",
+  booking_cutoff_hours: "" as number | "",
 };
 
 export default function AdminSlotsPage() {
@@ -46,6 +48,7 @@ export default function AdminSlotsPage() {
   const [bulkEnd, setBulkEnd] = useState("13:00");
   const [error, setError] = useState("");
   const [msg, setMsg] = useState("");
+  const [siteDefaultCutoff, setSiteDefaultCutoff] = useState(2);
 
   const load = useCallback(() => {
     admin.activities.list().then(setActivities);
@@ -64,11 +67,18 @@ export default function AdminSlotsPage() {
     load();
   }, [load]);
 
+  useEffect(() => {
+    fetchConfig()
+      .then((c) => setSiteDefaultCutoff(c.default_booking_cutoff_hours))
+      .catch(() => {});
+  }, []);
+
   function openNew() {
     setEditingId(null);
     setForm({
       ...emptySlot,
       activity_id: activities[0]?.id || 0,
+      booking_cutoff_hours: siteDefaultCutoff,
     });
     setModalOpen(true);
   }
@@ -87,8 +97,14 @@ export default function AdminSlotsPage() {
       call_phone: s.call_phone || "+1-727-380-0431",
       brand_label: s.brand_label || "",
       urgency_text: s.urgency_text || "",
+      booking_cutoff_hours: s.booking_cutoff_hours ?? "",
     });
     setModalOpen(true);
+  }
+
+  function cutoffForApi(): number | null {
+    if (form.booking_cutoff_hours === "") return null;
+    return Number(form.booking_cutoff_hours);
   }
 
   async function saveSlot(e: FormEvent) {
@@ -106,6 +122,7 @@ export default function AdminSlotsPage() {
       call_phone: form.is_call_to_book ? form.call_phone : null,
       brand_label: form.brand_label || null,
       urgency_text: form.urgency_text || null,
+      booking_cutoff_hours: cutoffForApi(),
     };
     try {
       if (editingId) {
@@ -147,6 +164,7 @@ export default function AdminSlotsPage() {
         call_phone: form.is_call_to_book ? form.call_phone : null,
         brand_label: form.brand_label || null,
         urgency_text: form.urgency_text || null,
+        booking_cutoff_hours: cutoffForApi(),
       });
       setMsg(`Created ${created.length} departures`);
       closeModal();
@@ -220,6 +238,7 @@ export default function AdminSlotsPage() {
               <th>When</th>
               <th>Tour</th>
               <th>Capacity</th>
+              <th>Cutoff</th>
               <th>Options</th>
               <th></th>
             </tr>
@@ -234,6 +253,11 @@ export default function AdminSlotsPage() {
                 <td>{s.activity_title}</td>
                 <td>
                   {s.booked_count}/{s.capacity}
+                </td>
+                <td>
+                  {s.booking_cutoff_hours != null
+                    ? `${s.booking_cutoff_hours}h`
+                    : `Default (${siteDefaultCutoff}h)`}
                 </td>
                 <td>
                   {s.is_call_to_book && <span className="admin-badge admin-badge-pending">Call</span>}
@@ -316,6 +340,27 @@ export default function AdminSlotsPage() {
                   value={form.capacity}
                   onChange={(e) => setForm({ ...form, capacity: Number(e.target.value) })}
                 />
+              </div>
+              <div className="admin-field">
+                <label>Stop online booking (hours before)</label>
+                <input
+                  type="number"
+                  min={0}
+                  max={168}
+                  value={form.booking_cutoff_hours}
+                  placeholder={`Site default (${siteDefaultCutoff})`}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      booking_cutoff_hours:
+                        e.target.value === "" ? "" : Number(e.target.value),
+                    })
+                  }
+                />
+                <small>
+                  Leave empty for site default ({siteDefaultCutoff}h). Use 0 to allow booking
+                  until departure starts.
+                </small>
               </div>
               <div className="admin-field">
                 <label>Promo badge</label>

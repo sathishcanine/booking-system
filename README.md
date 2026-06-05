@@ -1,4 +1,4 @@
-# Coastal Cruises — Custom Booking System
+# Alis-Adventure — Custom Booking System
 
 Site-specific booking for your WordPress tour business (FareHarbor-style UI), built with **React**, **FastAPI (Python)**, **SQLite/PostgreSQL**, and **Stripe**.
 

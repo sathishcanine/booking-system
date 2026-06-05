@@ -25,13 +25,13 @@ from app.schemas import (
     SlotDetailOut,
     TicketTypeOut,
 )
-from app.services.calendar_grid import build_month_calendar
+from app.services.calendar_grid import build_month_calendar, slot_to_out
 from app.seed import seed
 from app.services.availability import (
-    is_slot_in_past,
+    booking_deadline,
+    effective_cutoff_hours,
     slot_status,
     spots_left,
-    status_label,
 )
 from app.services.booking import create_booking, pending_holds_for_slot
 from app.services.pricing import apply_promo
@@ -70,7 +70,7 @@ async def lifespan(_: FastAPI):
     yield
 
 
-app = FastAPI(title="Coastal Cruises Booking API", lifespan=lifespan)
+app = FastAPI(title="Alis-Adventures Booking API", lifespan=lifespan)
 app.include_router(admin_router.router)
 
 app.add_middleware(
@@ -89,6 +89,7 @@ def get_config():
         publishable_key=settings.stripe_publishable_key,
         tax_rate_percent=settings.tax_rate_percent,
         site_timezone=settings.site_timezone,
+        default_booking_cutoff_hours=settings.default_booking_cutoff_hours,
     )
 
 
@@ -138,27 +139,7 @@ def get_calendar(week_start: date | None = None, db: Session = Depends(get_db)):
         d = slot.starts_at.date()
         if d not in days_map:
             continue
-        holds = pending_holds_for_slot(db, slot.id)
-        left = max(0, slot.capacity - slot.booked_count - holds)
-        st = slot_status(slot, holds)
-        act = slot.activity
-        days_map[d].append(
-            CalendarSlotOut(
-                id=slot.id,
-                activity_id=act.id,
-                title=act.title,
-                location_label=act.location_label,
-                starts_at=slot.starts_at,
-                ends_at=slot.ends_at,
-                card_description=slot.card_description or act.description,
-                card_image_url=slot.card_image_url or act.image_url,
-                emoji=act.emoji,
-                spots_left=left,
-                status=st.value,
-                promo_text=slot.promo_text,
-                duration_minutes=act.duration_minutes,
-            )
-        )
+        days_map[d].append(slot_to_out(db, slot))
 
     return CalendarWeekOut(
         start_date=start,
@@ -200,6 +181,9 @@ def get_slot(slot_id: int, db: Session = Depends(get_db)):
         meeting_instructions=slot.activity.meeting_instructions,
         ticket_types=[TicketTypeOut.model_validate(t) for t in tickets],
         max_tickets_per_booking=min(left, 20) if left > 0 else 20,
+        booking_cutoff_hours=effective_cutoff_hours(slot),
+        booking_deadline=booking_deadline(slot),
+        booking_closed=st.value == "closed",
     )
 
 

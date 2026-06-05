@@ -69,6 +69,7 @@ def _slot_out(slot: Slot) -> AdminSlotOut:
         call_phone=slot.call_phone,
         brand_label=slot.brand_label,
         urgency_text=slot.urgency_text,
+        booking_cutoff_hours=slot.booking_cutoff_hours,
         is_cancelled=slot.is_cancelled,
         activity_title=slot.activity.title if slot.activity else None,
     )
@@ -328,6 +329,7 @@ def bulk_create_slots(body: AdminBulkSlotsIn, db: Session = Depends(get_db)):
             call_phone=body.call_phone,
             brand_label=body.brand_label,
             urgency_text=body.urgency_text,
+            booking_cutoff_hours=body.booking_cutoff_hours,
         )
         db.add(slot)
         db.flush()

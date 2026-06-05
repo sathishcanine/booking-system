@@ -28,7 +28,7 @@ export default function AdminLoginPage() {
   return (
     <div className="admin-login-page">
       <div className="admin-login-card">
-        <h1>Coastal Cruises Admin</h1>
+        <h1>Alis-Adventure Admin</h1>
         <p>Manage tours, departures, ticket prices, and bookings.</p>
         <form onSubmit={onSubmit}>
           <div className="admin-field">

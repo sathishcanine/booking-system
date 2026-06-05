@@ -13,6 +13,16 @@ export function formatTime(iso: string): string {
   return `${h}:${m}`;
 }
 
+export function formatDateTime(iso: string): string {
+  return new Date(iso).toLocaleString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
 export function formatSlotRange(start: string, end: string): string {
   const s = new Date(start);
   const e = new Date(end);

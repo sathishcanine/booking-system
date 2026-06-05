@@ -12,7 +12,7 @@ import {
 } from "../api";
 import CheckoutForm from "../components/CheckoutForm";
 import OrderSummary from "../components/OrderSummary";
-import { formatMoney, formatSlotRange } from "../utils";
+import { formatDateTime, formatMoney, formatSlotRange } from "../utils";
 
 type QtyMap = Record<number, number>;
 
@@ -85,6 +85,7 @@ export default function BookingPage() {
 
   const maxSelectable = slot?.max_tickets_per_booking ?? 0;
   const isWaitlistTrip = slot?.status === "waitlist";
+  const isBookingClosed = slot?.booking_closed ?? false;
 
   function maxForTicket(ticketId: number): number {
     if (!slot || isWaitlistTrip) return 20;
@@ -181,7 +182,21 @@ export default function BookingPage() {
               {slot.description}
               {slot.emoji && ` ${slot.emoji}`}
             </p>
-            {isWaitlistTrip ? (
+            {isBookingClosed ? (
+              <p className="urgency booking-closed">
+                Online booking is closed for this departure.
+                {slot.booking_cutoff_hours > 0 ? (
+                  <>
+                    {" "}
+                    Book at least {slot.booking_cutoff_hours}{" "}
+                    {slot.booking_cutoff_hours === 1 ? "hour" : "hours"} before sail time
+                    (deadline was {formatDateTime(slot.booking_deadline)}).
+                  </>
+                ) : (
+                  <> This departure has already started or ended.</>
+                )}
+              </p>
+            ) : isWaitlistTrip ? (
               <p className="urgency waitlist">This trip is full — join the waitlist.</p>
             ) : slot.spots_left > 0 ? (
               <p className={`urgency${slot.status === "low" ? "" : " availability"}`}>
@@ -192,7 +207,16 @@ export default function BookingPage() {
           </div>
         </section>
 
-        {!showPayment ? (
+        {isBookingClosed && !showPayment ? (
+          <section className="booking-form card">
+            <p className="error" style={{ margin: 0 }}>
+              This departure is not available for online booking. Choose another time on the
+              calendar or call us to inquire.
+            </p>
+          </section>
+        ) : null}
+
+        {!showPayment && !isBookingClosed ? (
           <form className="booking-form" onSubmit={onSubmit}>
             <h2>Plan your experience</h2>
             {!isWaitlistTrip && maxSelectable > 0 && (

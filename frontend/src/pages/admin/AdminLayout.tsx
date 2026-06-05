@@ -16,8 +16,8 @@ export default function AdminLayout() {
     <div className="admin-shell">
       <aside className="admin-sidebar">
         <div className="admin-sidebar-brand">
-          <strong>COASTAL CRUISES</strong>
-          <small>Alis-Adventure — Admin</small>
+          <strong>Alis-Adventure</strong>
+          <small>Admin</small>
         </div>
         <nav className="admin-nav">
           {links.map((l) => (

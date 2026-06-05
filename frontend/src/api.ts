@@ -18,6 +18,9 @@ export type CalendarSlot = {
   call_phone: string | null;
   brand_label: string | null;
   urgency_text: string | null;
+  booking_cutoff_hours: number;
+  booking_deadline: string;
+  booking_closed: boolean;
 };
 
 export type CalendarCell = {
@@ -64,12 +67,16 @@ export type SlotDetail = {
   meeting_instructions: string | null;
   ticket_types: TicketType[];
   max_tickets_per_booking: number;
+  booking_cutoff_hours: number;
+  booking_deadline: string;
+  booking_closed: boolean;
 };
 
 export type AppConfig = {
   publishable_key: string;
   tax_rate_percent: number;
   site_timezone: string;
+  default_booking_cutoff_hours: number;
 };
 
 export type BookingSummary = {

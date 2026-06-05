@@ -35,6 +35,7 @@ def _ensure_slot_columns():
         ("call_phone", "VARCHAR(30)"),
         ("brand_label", "VARCHAR(80)"),
         ("urgency_text", "VARCHAR(120)"),
+        ("booking_cutoff_hours", "INTEGER"),
     ]
     with engine.begin() as conn:
         for name, typedef in alters:

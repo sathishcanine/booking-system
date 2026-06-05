@@ -18,7 +18,12 @@ from app.models import (
     TicketType,
 )
 from app.schemas import BookingLineIn, CreateBookingIn
-from app.services.availability import is_slot_in_past, slot_status, spots_left
+from app.services.availability import (
+    is_past_booking_cutoff,
+    is_slot_departed,
+    slot_status,
+    spots_left,
+)
 from app.services.pricing import apply_promo, calc_tax
 from app.services.promo import is_promo_exhausted
 
@@ -83,8 +88,10 @@ def create_booking(db: Session, payload: CreateBookingIn) -> Booking:
     )
     if not slot:
         raise ValueError("Slot not found")
-    if is_slot_in_past(slot):
+    if is_slot_departed(slot):
         raise ValueError("This departure has already started")
+    if is_past_booking_cutoff(slot):
+        raise ValueError("Online booking has closed for this departure")
 
     holds = pending_holds_for_slot(db, slot.id)
     left = spots_left(slot) - holds

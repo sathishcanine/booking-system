@@ -21,6 +21,7 @@ class SlotStatus(str, enum.Enum):
     LOW = "low"  # few spots left
     SOLD_OUT = "sold_out"
     WAITLIST = "waitlist"
+    CLOSED = "closed"  # past online booking cutoff
 
 
 class BookingStatus(str, enum.Enum):
@@ -80,6 +81,7 @@ class Slot(Base):
     call_phone: Mapped[str | None] = mapped_column(String(30))
     brand_label: Mapped[str | None] = mapped_column(String(80))
     urgency_text: Mapped[str | None] = mapped_column(String(120))
+    booking_cutoff_hours: Mapped[int | None] = mapped_column(Integer)
 
     activity: Mapped["Activity"] = relationship(back_populates="slots")
     bookings: Mapped[list["Booking"]] = relationship(back_populates="slot")
