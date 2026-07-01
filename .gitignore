@@ -10,8 +10,8 @@ frontend/.env.local
 frontend/.env.production
 node_modules/
 frontend/dist/
-docs/Alis-Adventure-Production-Plan.pdf
-docs/Alis-Adventure-System-Design.pdf
+docs/
+wordpress/
 .DS_Store
 backend/uploads/listings/*
 !backend/uploads/listings/.gitkeep
