@@ -1095,10 +1095,16 @@ def seed():
     db.commit()
 
     if db.query(Activity).first():
-        _seed_demo_reviews(db)
-        db.commit()
+        if settings.seed_demo_data:
+            _seed_demo_reviews(db)
+            db.commit()
+            ensure_demo_months()
         db.close()
-        ensure_demo_months()
+        return
+
+    if not settings.seed_demo_data:
+        db.close()
+        print("Skipping demo listings (SEED_DEMO_DATA=false / APP_ENV=production).")
         return
 
     activities = [

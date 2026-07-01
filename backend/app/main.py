@@ -11,6 +11,8 @@ from sqlalchemy.orm import Session, joinedload
 import stripe
 
 from app.admin_auth import validate_admin_auth_config
+from app.middleware.rate_limit import RateLimitMiddleware
+from app.middleware.security_headers import SecurityHeadersMiddleware
 from app.config import BACKEND_ROOT, settings
 from app.services.listing_uploads import ensure_upload_dir
 from app.database import get_db
@@ -59,6 +61,27 @@ from app.platform_auth import PlatformUser, optional_renter_user
 from app.services.stripe_service import attach_payment_intent, confirm_booking_paid
 
 logger = logging.getLogger(__name__)
+
+
+def _cors_origins() -> list[str]:
+    base = settings.frontend_url.rstrip("/")
+    if settings.is_production:
+        return [base]
+    return list({base, "http://localhost:5173", "http://127.0.0.1:5173"})
+
+
+def _cors_middleware_kwargs() -> dict:
+    kwargs: dict = {
+        "allow_origins": _cors_origins(),
+        "allow_credentials": True,
+        "allow_methods": ["*"],
+        "allow_headers": ["*"],
+    }
+    if not settings.is_production:
+        kwargs["allow_origin_regex"] = (
+            r"https://.*\.ngrok-free\.app|https://.*\.ngrok\.io|https://.*\.ngrok\.app"
+        )
+    return kwargs
 
 
 def _booking_summary(booking: Booking, client_secret: str | None) -> BookingSummaryOut:
@@ -153,14 +176,14 @@ async def public_cache_headers(request: Request, call_next):
     return response
 
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[settings.frontend_url, "http://localhost:5173", "http://127.0.0.1:5173"],
-    allow_origin_regex=r"https://.*\.ngrok-free\.app|https://.*\.ngrok\.io|https://.*\.ngrok\.app",
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+app.add_middleware(RateLimitMiddleware)
+app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(CORSMiddleware, **_cors_middleware_kwargs())
+
+
+@app.get("/api/health")
+def health():
+    return {"status": "ok", "env": settings.app_env}
 
 
 @app.get("/api/config", response_model=ConfigOut)

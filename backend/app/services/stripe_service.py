@@ -116,6 +116,7 @@ def confirm_booking_paid(db, booking_id: int, payment_intent_id: str) -> bool:
         booking.status = BookingStatus.PAID
         record_promo_use(db, booking.promo_code)
         db.commit()
+        _send_confirmation_email(db, booking)
         return True
 
     if booking.booking_kind == "rental" and booking.activity_id and booking.rental_starts_at:
@@ -187,7 +188,17 @@ def confirm_booking_paid(db, booking_id: int, payment_intent_id: str) -> bool:
     booking.status = BookingStatus.PAID
     record_promo_use(db, booking.promo_code)
     db.commit()
+    _send_confirmation_email(db, booking)
     return True
+
+
+def _send_confirmation_email(db, booking: Booking) -> None:
+    from app.services.email_service import send_booking_confirmation
+
+    try:
+        send_booking_confirmation(db, booking)
+    except Exception:
+        logger.exception("Confirmation email failed for %s", booking.reference)
 
 
 def refund_booking_payment(db: Session, booking: Booking, refund_cents: int) -> str | None:
