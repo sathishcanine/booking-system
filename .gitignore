@@ -10,6 +10,7 @@ frontend/.env.local
 frontend/.env.production
 node_modules/
 frontend/dist/
+docs/Alis-Adventure-Production-Plan.pdf
 .DS_Store
 backend/uploads/listings/*
 !backend/uploads/listings/.gitkeep
