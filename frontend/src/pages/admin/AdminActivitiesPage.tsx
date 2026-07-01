@@ -1,53 +1,137 @@
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { useLocation } from "react-router-dom";
 import {
   admin,
-  COASTAL_LOCATIONS,
-  SAMPLE_TOURS,
+  BOAT_AMENITIES,
+  BOAT_TYPES,
+  MARKETPLACE_CATEGORIES,
+  getAuthRole,
+  LISTING_STATUS_LABELS,
+  uploadListingPhoto,
   type AdminActivityListItem,
-  type AdminTicketType,
+  type ListingStatus,
 } from "../../admin/adminApi";
 import AdminModal from "../../admin/AdminModal";
-import { formatDollarInput, formatMoney, parseDollarInput } from "../../utils";
+import BoatMakeModelSelect from "../../components/BoatMakeModelSelect";
+import PlacesAutocompleteInput from "../../components/PlacesAutocompleteInput";
+import { MARKET_CITY, MARKET_LABEL, MARKET_STATE } from "../../config/market";
+import {
+  ALL_BOAT_MAKES,
+  modelsForMake,
+  TOP_BOAT_MAKES,
+} from "../../data/boatMakesModels";
+import { showToast } from "../../toast";
+import { formatMoney } from "../../utils";
+import type { PlaceSelection } from "../../utils/placeLocation";
+
+function reportError(setError: (msg: string) => void, message: string) {
+  setError(message);
+  showToast(message);
+}
 
 const emptyActivity = {
   title: "",
   slug: "",
   description: "",
-  duration_minutes: 150,
-  location_label: COASTAL_LOCATIONS[0],
   image_url: "",
-  emoji: "",
   meeting_instructions: "",
   is_active: true,
+  listing_status: "draft" as ListingStatus,
+  max_guests: null as number | null,
+  boat_type: "pontoon",
+  boat_make: "",
+  boat_model: "",
+  marina_name: "",
+  city: MARKET_CITY,
+  state: MARKET_STATE,
+  amenities: [] as string[],
+  photos_text: "",
+  captain_required: false,
+  hourly_rate_dollars: "",
+  length_ft: null as number | null,
+  min_rental_hours: 2,
+  max_rental_hours: 8,
+  instant_book: true,
+  bareboat_allowed: true,
+  activity_tags: [] as string[],
 };
 
-const emptyTicket = {
-  name: "",
-  subtitle: "",
-  price_dollars: "",
-  sort_order: 0,
-  max_per_booking: null as number | null,
-};
+type CaptainMode = "captained" | "bareboat";
+
+function captainModeFromActivity(activity: {
+  captain_required: boolean;
+  bareboat_allowed: boolean;
+}): CaptainMode {
+  return activity.bareboat_allowed && !activity.captain_required ? "bareboat" : "captained";
+}
+
+function activityWithCaptainMode<T extends typeof emptyActivity>(
+  activity: T,
+  mode: CaptainMode
+): T {
+  if (mode === "bareboat") {
+    return { ...activity, captain_required: false, bareboat_allowed: true };
+  }
+  return { ...activity, captain_required: true, bareboat_allowed: false };
+}
+
+function applyLocationPlace(
+  current: typeof emptyActivity,
+  place: PlaceSelection,
+  field: "marina" | "city"
+) {
+  if (field === "marina") {
+    return {
+      ...current,
+      marina_name: place.marinaName || place.label,
+      city: place.city,
+      state: place.state || current.state,
+    };
+  }
+  return {
+    ...current,
+    city: place.city,
+    state: place.state || current.state,
+  };
+}
+
+function listingBadgeClass(status: ListingStatus) {
+  if (status === "published") return "admin-badge-listing-live";
+  if (status === "pending_review") return "admin-badge-listing-pending";
+  if (status === "delisted") return "admin-badge-listing-delisted";
+  return "admin-badge-listing-draft";
+}
 
 export default function AdminActivitiesPage() {
+  const { pathname } = useLocation();
+  const isOwnerMode = pathname.startsWith("/owner");
+  const isSuperAdmin = getAuthRole() === "super_admin";
   const [list, setList] = useState<AdminActivityListItem[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [activity, setActivity] = useState(emptyActivity);
-  const [tickets, setTickets] = useState<AdminTicketType[]>([]);
-  const [ticketForm, setTicketForm] = useState(emptyTicket);
-  const [editingTicketId, setEditingTicketId] = useState<number | null>(null);
   const [error, setError] = useState("");
   const [msg, setMsg] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
+  const [uploadingPhotos, setUploadingPhotos] = useState(false);
+
+  const photoUrls = useMemo(
+    () =>
+      activity.photos_text
+        .split("\n")
+        .map((s) => s.trim())
+        .filter(Boolean),
+    [activity.photos_text]
+  );
 
   function closeModal() {
     setModalOpen(false);
-    setEditingTicketId(null);
-    setTicketForm(emptyTicket);
   }
 
   const loadList = useCallback(() => {
-    admin.activities.list().then(setList).catch((e) => setError(e.message));
+    admin.activities
+      .list()
+      .then(setList)
+      .catch((e) => reportError(setError, e.message));
   }, []);
 
   const loadActivity = useCallback((id: number) => {
@@ -58,75 +142,196 @@ export default function AdminActivitiesPage() {
           title: a.title,
           slug: a.slug,
           description: a.description || "",
-          duration_minutes: a.duration_minutes,
-          location_label: a.location_label || "",
           image_url: a.image_url || "",
-          emoji: a.emoji || "",
           meeting_instructions: a.meeting_instructions || "",
           is_active: a.is_active,
+          listing_status: a.listing_status,
+          max_guests: a.max_guests,
+          boat_type: a.boat_type || "pontoon",
+          boat_make: a.boat_make || "",
+          boat_model: a.boat_model || "",
+          marina_name: a.marina_name || "",
+          city: a.city || "",
+          state: a.state || "FL",
+          amenities: a.amenities || [],
+          photos_text: (a.photo_urls?.length ? a.photo_urls : []).join("\n"),
+          captain_required: a.captain_required,
+          hourly_rate_dollars: a.hourly_rate_cents
+            ? String(a.hourly_rate_cents / 100)
+            : "",
+          length_ft: a.length_ft,
+          min_rental_hours: a.min_rental_hours ?? 2,
+          max_rental_hours: a.max_rental_hours ?? 8,
+          instant_book: a.instant_book ?? true,
+          bareboat_allowed: a.bareboat_allowed ?? true,
+          activity_tags: a.activity_tags ?? [],
         });
-        setTickets(a.ticket_types);
         setSelectedId(id);
         setModalOpen(true);
       })
-      .catch((e) => setError(e.message));
+      .catch((e) => reportError(setError, e.message));
   }, []);
 
   useEffect(() => {
     loadList();
   }, [loadList]);
 
-  function newActivity(template?: (typeof SAMPLE_TOURS)[0]) {
+  function newActivity() {
     setSelectedId(null);
-    setActivity(
-      template
-        ? {
-            ...emptyActivity,
-            title: template.title,
-            emoji: template.emoji,
-            duration_minutes: template.duration,
-            location_label: template.location,
-            description: `${template.duration / 60}hr ${template.title}`,
-          }
-        : { ...emptyActivity }
-    );
-    setTickets([]);
+    setActivity({ ...emptyActivity });
     setModalOpen(true);
     setError("");
     setMsg("");
   }
 
+  function setPhotoUrls(urls: string[]) {
+    setActivity({
+      ...activity,
+      photos_text: urls.join("\n"),
+      image_url: activity.image_url && urls.includes(activity.image_url)
+        ? activity.image_url
+        : urls[0] || "",
+    });
+  }
+
+  async function handlePhotoUpload(e: ChangeEvent<HTMLInputElement>) {
+    const files = e.target.files;
+    if (!files?.length) return;
+    setUploadingPhotos(true);
+    setError("");
+    try {
+      const uploaded: string[] = [];
+      for (const file of Array.from(files)) {
+        const { url } = await uploadListingPhoto(file);
+        uploaded.push(url);
+      }
+      setPhotoUrls([...photoUrls, ...uploaded]);
+      setMsg(`Uploaded ${uploaded.length} photo${uploaded.length === 1 ? "" : "s"}`);
+    } catch (err) {
+      reportError(
+        setError,
+        err instanceof Error ? err.message : "Upload failed"
+      );
+    } finally {
+      setUploadingPhotos(false);
+      e.target.value = "";
+    }
+  }
+
+  function removePhoto(url: string) {
+    setPhotoUrls(photoUrls.filter((u) => u !== url));
+  }
+
+  function setCoverPhoto(url: string) {
+    setActivity({ ...activity, image_url: url });
+  }
+
   async function saveActivity(e: FormEvent) {
     e.preventDefault();
     setError("");
+    const photo_urls = activity.photos_text
+      .split("\n")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (!activity.boat_make.trim()) {
+      reportError(setError, "Make is required");
+      return;
+    }
+    if (!activity.boat_model.trim()) {
+      reportError(setError, "Model is required");
+      return;
+    }
     const body = {
-      ...activity,
+      title: activity.title,
       slug: activity.slug || "",
       description: activity.description || null,
-      location_label: activity.location_label || null,
+      duration_minutes: activity.max_rental_hours * 60,
+      location_label:
+        activity.marina_name ||
+        [activity.city, activity.state].filter(Boolean).join(", ") ||
+        null,
       image_url: activity.image_url || null,
-      emoji: activity.emoji || null,
+      emoji: null,
       meeting_instructions: activity.meeting_instructions || null,
+      is_active: activity.is_active,
+      max_guests: activity.max_guests,
+      boat_type: activity.boat_type || null,
+      boat_make: activity.boat_make.trim(),
+      boat_model: activity.boat_model.trim(),
+      marina_name: activity.marina_name || null,
+      city: MARKET_CITY,
+      state: MARKET_STATE,
+      amenities: activity.amenities,
+      photo_urls,
+      captain_required: activity.captain_required,
+      hourly_rate_cents: activity.hourly_rate_dollars
+        ? Math.round(parseFloat(activity.hourly_rate_dollars) * 100)
+        : null,
+      length_ft: activity.length_ft,
+      min_rental_hours: activity.min_rental_hours,
+      max_rental_hours: activity.max_rental_hours,
+      instant_book: activity.instant_book,
+      bareboat_allowed: activity.bareboat_allowed,
+      activity_tags: activity.activity_tags,
     };
     try {
       if (selectedId) {
         await admin.activities.update(selectedId, body);
-        setMsg("Tour updated");
+        setMsg(isOwnerMode ? "Boat updated" : "Listing updated");
         loadActivity(selectedId);
       } else {
         const created = await admin.activities.create(body);
-        setMsg("Tour created — add ticket types below");
+        setMsg(isOwnerMode ? "Boat created" : "Listing created");
         setSelectedId(created.id);
         loadActivity(created.id);
       }
       loadList();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Save failed");
+      reportError(setError, err instanceof Error ? err.message : "Save failed");
     }
   }
 
+  async function runListingAction(
+    action: "submitReview" | "approve" | "reject" | "delist",
+    id: number
+  ) {
+    setError("");
+    try {
+      const fn = admin.activities[action];
+      await fn(id);
+      const successMsg =
+        action === "submitReview"
+          ? "Submitted for review"
+          : action === "approve"
+            ? "Listing approved — now live"
+            : action === "reject"
+              ? "Listing returned to draft"
+              : "Listing delisted";
+      setMsg(successMsg);
+      showToast(successMsg);
+      loadList();
+      if (action === "submitReview" && selectedId === id) {
+        closeModal();
+        setSelectedId(null);
+      } else if (selectedId === id) {
+        loadActivity(id);
+      }
+    } catch (err) {
+      reportError(setError, err instanceof Error ? err.message : "Action failed");
+    }
+  }
+
+  function toggleAmenity(name: string) {
+    setActivity((prev) => ({
+      ...prev,
+      amenities: prev.amenities.includes(name)
+        ? prev.amenities.filter((a) => a !== name)
+        : [...prev.amenities, name],
+    }));
+  }
+
   async function deleteActivity() {
-    if (!selectedId || !confirm("Delete this tour? Slots may be removed.")) return;
+    if (!selectedId || !confirm("Delete this boat listing?")) return;
     try {
       const res = await admin.activities.delete(selectedId);
       setMsg(res.message || "Deleted");
@@ -134,70 +339,16 @@ export default function AdminActivitiesPage() {
       setSelectedId(null);
       loadList();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Delete failed");
-    }
-  }
-
-  async function saveTicket(e: FormEvent) {
-    e.preventDefault();
-    if (!selectedId) {
-      setError("Save the tour first");
-      return;
-    }
-    const price_cents = parseDollarInput(ticketForm.price_dollars);
-    if (price_cents === null) {
-      setError("Enter a valid price (e.g. 55.55 or 0.55)");
-      return;
-    }
-    const body = {
-      name: ticketForm.name,
-      subtitle: ticketForm.subtitle || null,
-      price_cents,
-      sort_order: ticketForm.sort_order,
-      max_per_booking: ticketForm.max_per_booking || null,
-    };
-    try {
-      if (editingTicketId) {
-        await admin.ticketTypes.update(editingTicketId, body);
-      } else {
-        await admin.ticketTypes.create(selectedId, body);
-      }
-      setTicketForm(emptyTicket);
-      setEditingTicketId(null);
-      loadActivity(selectedId);
-      setMsg("Ticket type saved");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Save failed");
-    }
-  }
-
-  function editTicket(t: AdminTicketType) {
-    setEditingTicketId(t.id);
-    setTicketForm({
-      name: t.name,
-      subtitle: t.subtitle || "",
-      price_dollars: formatDollarInput(t.price_cents),
-      sort_order: t.sort_order,
-      max_per_booking: t.max_per_booking,
-    });
-  }
-
-  async function deleteTicket(id: number) {
-    if (!confirm("Delete this ticket type?")) return;
-    try {
-      await admin.ticketTypes.delete(id);
-      if (selectedId) loadActivity(selectedId);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Delete failed");
+      reportError(setError, err instanceof Error ? err.message : "Delete failed");
     }
   }
 
   return (
     <>
       <header className="admin-topbar">
-        <h1>Tours &amp; ticket types</h1>
+        <h1>{isOwnerMode ? "My boats" : "Boats"}</h1>
         <button type="button" className="admin-btn admin-btn-primary" onClick={() => newActivity()}>
-          + New tour
+          + Add boat
         </button>
       </header>
       {error && <p className="admin-error">{error}</p>}
@@ -205,30 +356,22 @@ export default function AdminActivitiesPage() {
 
       <section className="admin-card">
         <p className="admin-hint" style={{ marginTop: 0 }}>
-          Quick add popular St. Pete tours:
+          {isOwnerMode
+            ? "Add photos, hourly rate, and rental options. Submit for review when ready — a platform admin will approve your listing before it appears on the marketplace."
+            : "Review and manage boat listings from all owners. Approve pending listings before they go live on the marketplace."}
         </p>
-        <div className="admin-actions">
-          {SAMPLE_TOURS.map((t) => (
-            <button
-              key={t.title}
-              type="button"
-              className="admin-btn admin-btn-sm"
-              onClick={() => newActivity(t)}
-            >
-              {t.emoji} {t.title}
-            </button>
-          ))}
-        </div>
       </section>
 
       <section className="admin-card">
         <table className="admin-table">
           <thead>
             <tr>
-              <th>Tour</th>
+              <th>Boat</th>
+              {isSuperAdmin && <th>Owner</th>}
+              <th>Status</th>
+              <th>Type</th>
               <th>Location</th>
-              <th>Tickets</th>
-              <th>Slots</th>
+              <th>Hourly</th>
               <th></th>
             </tr>
           </thead>
@@ -239,13 +382,39 @@ export default function AdminActivitiesPage() {
                   <strong>{a.title}</strong>
                   {!a.is_active && <span className="admin-badge admin-badge-cancelled"> inactive</span>}
                 </td>
-                <td>{a.location_label}</td>
-                <td>{a.ticket_type_count}</td>
-                <td>{a.slot_count}</td>
+                {isSuperAdmin && <td>{a.organization_name || "—"}</td>}
                 <td>
-                  <button type="button" className="admin-btn admin-btn-sm" onClick={() => loadActivity(a.id)}>
-                    Edit
-                  </button>
+                  <span className={`admin-badge ${listingBadgeClass(a.listing_status)}`}>
+                    {LISTING_STATUS_LABELS[a.listing_status]}
+                  </span>
+                </td>
+                <td>{BOAT_TYPES.find((t) => t.value === a.boat_type)?.label || "—"}</td>
+                <td>{a.city || "—"}</td>
+                <td>{a.hourly_rate_cents ? formatMoney(a.hourly_rate_cents) : "—"}</td>
+                <td>
+                  <div className="admin-actions" style={{ margin: 0, flexWrap: "nowrap" }}>
+                    <button type="button" className="admin-btn admin-btn-sm" onClick={() => loadActivity(a.id)}>
+                      Edit
+                    </button>
+                    {isSuperAdmin && a.listing_status === "pending_review" && (
+                      <>
+                        <button
+                          type="button"
+                          className="admin-btn admin-btn-sm admin-btn-primary"
+                          onClick={() => runListingAction("approve", a.id)}
+                        >
+                          Approve
+                        </button>
+                        <button
+                          type="button"
+                          className="admin-btn admin-btn-sm"
+                          onClick={() => runListingAction("reject", a.id)}
+                        >
+                          Reject
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}
@@ -255,20 +424,103 @@ export default function AdminActivitiesPage() {
 
       <AdminModal
         open={modalOpen}
-        title={selectedId ? "Edit tour" : "New tour"}
+        title={selectedId ? "Edit boat" : "New boat"}
         onClose={closeModal}
         wide={Boolean(selectedId)}
       >
           <form onSubmit={saveActivity}>
             <div className="admin-form-grid">
               <div className="admin-field">
-                <label>Title *</label>
+                <label>Listing title *</label>
                 <input
                   required
                   value={activity.title}
                   onChange={(e) => setActivity({ ...activity, title: e.target.value })}
-                  placeholder="Island Sunset & Skyway Light Show"
+                  placeholder="Give title to your boat for listing"
                 />
+              </div>
+              <BoatMakeModelSelect
+                label="Make"
+                value={activity.boat_make}
+                options={[...ALL_BOAT_MAKES]}
+                topOptions={[...TOP_BOAT_MAKES]}
+                topSectionLabel="Top makes"
+                required
+                placeholder="Search or select make"
+                onChange={(boat_make) =>
+                  setActivity({
+                    ...activity,
+                    boat_make,
+                    boat_model:
+                      activity.boat_make !== boat_make ? "" : activity.boat_model,
+                  })
+                }
+              />
+              <BoatMakeModelSelect
+                label="Model"
+                value={activity.boat_model}
+                options={modelsForMake(activity.boat_make)}
+                required
+                disabled={!activity.boat_make.trim()}
+                placeholder={
+                  activity.boat_make.trim()
+                    ? "Search or select model"
+                    : "Choose make first"
+                }
+                onChange={(boat_model) => setActivity({ ...activity, boat_model })}
+              />
+              <div className="admin-field">
+                <label>Boat type</label>
+                <select
+                  value={activity.boat_type}
+                  onChange={(e) => setActivity({ ...activity, boat_type: e.target.value })}
+                >
+                  {BOAT_TYPES.map((t) => (
+                    <option key={t.value} value={t.value}>
+                      {t.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="admin-field">
+                <label>Max guests *</label>
+                <input
+                  type="number"
+                  min={1}
+                  max={500}
+                  value={activity.max_guests ?? ""}
+                  onChange={(e) =>
+                    setActivity({
+                      ...activity,
+                      max_guests: e.target.value ? Number(e.target.value) : null,
+                    })
+                  }
+                  placeholder="12"
+                />
+              </div>
+              <div className="admin-field">
+                <label>Boat location</label>
+                <PlacesAutocompleteInput
+                  mode="marina"
+                  value={activity.marina_name}
+                  onChange={(v) => setActivity({ ...activity, marina_name: v })}
+                  onPlaceSelect={(place) =>
+                    setActivity((current) => applyLocationPlace(current, place, "marina"))
+                  }
+                  placeholder="Search marina, dock, or address"
+                />
+                <p className="admin-hint">
+                  Pick from Google Maps to auto-fill city and state.
+                </p>
+              </div>
+              <div className="admin-field">
+                <label>City</label>
+                <input value={MARKET_CITY} readOnly disabled aria-readonly />
+                <p className="admin-hint">All listings are in {MARKET_LABEL}.</p>
+              </div>
+              <div className="admin-field">
+                <label>State</label>
+                <input value={MARKET_STATE} readOnly disabled aria-readonly />
               </div>
               <div className="admin-field">
                 <label>URL slug</label>
@@ -278,45 +530,208 @@ export default function AdminActivitiesPage() {
                   placeholder="auto-generated if empty"
                 />
               </div>
+              <div className="admin-field full">
+                <label>Boat photos</label>
+                <p className="admin-hint">
+                  Upload JPEG, PNG, or WebP images (max 8 MB). The cover photo appears on search
+                  cards — set it with &ldquo;Use as cover&rdquo;.
+                </p>
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  multiple
+                  disabled={uploadingPhotos}
+                  onChange={handlePhotoUpload}
+                />
+                {uploadingPhotos && <p className="admin-hint">Uploading…</p>}
+                {photoUrls.length > 0 && (
+                  <div className="listing-photo-grid">
+                    {photoUrls.map((url) => (
+                      <div
+                        key={url}
+                        className={`listing-photo-thumb${
+                          activity.image_url === url ? " listing-photo-thumb--cover" : ""
+                        }`}
+                      >
+                        <img src={url} alt="" loading="lazy" />
+                        <div className="listing-photo-thumb-actions">
+                          {activity.image_url === url ? (
+                            <span className="listing-photo-cover-badge">Cover</span>
+                          ) : (
+                            <button
+                              type="button"
+                              className="admin-btn admin-btn-sm"
+                              onClick={() => setCoverPhoto(url)}
+                            >
+                              Use as cover
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            className="admin-btn admin-btn-sm admin-btn-danger"
+                            onClick={() => removePhoto(url)}
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div className="admin-field full">
+                <label>Photo URLs (optional)</label>
+                <textarea
+                  value={activity.photos_text}
+                  onChange={(e) => {
+                    const text = e.target.value;
+                    const urls = text
+                      .split("\n")
+                      .map((s) => s.trim())
+                      .filter(Boolean);
+                    setActivity({
+                      ...activity,
+                      photos_text: text,
+                      image_url: activity.image_url || urls[0] || "",
+                    });
+                  }}
+                  rows={2}
+                  placeholder="Or paste image URLs, one per line"
+                />
+              </div>
+              <div className="admin-field full">
+                <label>Amenities</label>
+                <div className="amenity-chips">
+                  {BOAT_AMENITIES.map((name) => (
+                    <label key={name} className="amenity-chip">
+                      <input
+                        type="checkbox"
+                        checked={activity.amenities.includes(name)}
+                        onChange={() => toggleAmenity(name)}
+                      />
+                      {name}
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <div className="admin-field full">
+                <h3 className="admin-subsection-title">Pricing</h3>
+                <p className="admin-hint">
+                  Hourly rate appears on search cards, the date calendar, and checkout quotes.
+                </p>
+              </div>
               <div className="admin-field">
-                <label>Duration (minutes)</label>
+                <label>Hourly rate ($)</label>
                 <input
                   type="number"
-                  min={15}
-                  value={activity.duration_minutes}
+                  min={0}
+                  step={1}
+                  value={activity.hourly_rate_dollars}
                   onChange={(e) =>
-                    setActivity({ ...activity, duration_minutes: Number(e.target.value) })
+                    setActivity({ ...activity, hourly_rate_dollars: e.target.value })
+                  }
+                  placeholder="303"
+                  required
+                />
+              </div>
+              <div className="admin-field">
+                <label>Length (ft)</label>
+                <input
+                  type="number"
+                  min={1}
+                  value={activity.length_ft ?? ""}
+                  onChange={(e) =>
+                    setActivity({
+                      ...activity,
+                      length_ft: e.target.value ? Number(e.target.value) : null,
+                    })
                   }
                 />
               </div>
               <div className="admin-field">
-                <label>Departure location</label>
-                <select
-                  value={activity.location_label}
-                  onChange={(e) => setActivity({ ...activity, location_label: e.target.value })}
-                >
-                  {COASTAL_LOCATIONS.map((loc) => (
-                    <option key={loc} value={loc}>
-                      {loc}
-                    </option>
+                <label>Min rental (hours)</label>
+                <input
+                  type="number"
+                  min={1}
+                  max={24}
+                  value={activity.min_rental_hours}
+                  onChange={(e) =>
+                    setActivity({ ...activity, min_rental_hours: Number(e.target.value) })
+                  }
+                />
+              </div>
+              <div className="admin-field">
+                <label>Max rental (hours)</label>
+                <input
+                  type="number"
+                  min={1}
+                  max={24}
+                  value={activity.max_rental_hours}
+                  onChange={(e) =>
+                    setActivity({ ...activity, max_rental_hours: Number(e.target.value) })
+                  }
+                />
+              </div>
+              <div className="admin-field full">
+                <label>Categories (search browse)</label>
+                <div className="amenity-chips">
+                  {MARKETPLACE_CATEGORIES.map((c) => (
+                    <label key={c.id} className="amenity-chip">
+                      <input
+                        type="checkbox"
+                        checked={activity.activity_tags.includes(c.id)}
+                        onChange={() => {
+                          const tags = activity.activity_tags.includes(c.id)
+                            ? activity.activity_tags.filter((t) => t !== c.id)
+                            : [...activity.activity_tags, c.id];
+                          setActivity({ ...activity, activity_tags: tags });
+                        }}
+                      />
+                      {c.label}
+                    </label>
                   ))}
-                </select>
+                </div>
               </div>
               <div className="admin-field">
-                <label>Emoji</label>
-                <input
-                  value={activity.emoji}
-                  onChange={(e) => setActivity({ ...activity, emoji: e.target.value })}
-                  placeholder="🐬🌅"
-                />
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={activity.instant_book}
+                    onChange={(e) =>
+                      setActivity({ ...activity, instant_book: e.target.checked })
+                    }
+                  />{" "}
+                  Instant book
+                </label>
               </div>
-              <div className="admin-field">
-                <label>Image URL</label>
-                <input
-                  value={activity.image_url}
-                  onChange={(e) => setActivity({ ...activity, image_url: e.target.value })}
-                  placeholder="https://..."
-                />
+              <div className="admin-field full">
+                <label>Captain</label>
+                <p className="search-filter-popover-hint" style={{ marginTop: "0.35rem" }}>
+                  Select if renters need a captain or can operate the boat themselves.
+                </p>
+                <div className="search-filter-popover-btns">
+                  {(
+                    [
+                      ["captained", "Captained"],
+                      ["bareboat", "No captain"],
+                    ] as const
+                  ).map(([mode, label]) => (
+                    <button
+                      key={mode}
+                      type="button"
+                      className={`search-filter-chip${
+                        captainModeFromActivity(activity) === mode
+                          ? " search-filter-chip--active"
+                          : ""
+                      }`}
+                      onClick={() =>
+                        setActivity(activityWithCaptainMode(activity, mode))
+                      }
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
               </div>
               <div className="admin-field full">
                 <label>Description (booking page)</label>
@@ -344,128 +759,69 @@ export default function AdminActivitiesPage() {
                     checked={activity.is_active}
                     onChange={(e) => setActivity({ ...activity, is_active: e.target.checked })}
                   />{" "}
-                  Active on calendar
+                  Active on marketplace
                 </label>
               </div>
             </div>
             <div className="admin-actions">
               <button type="submit" className="admin-btn admin-btn-primary">
-                Save tour
+                Save boat
               </button>
+              {selectedId && isOwnerMode && activity.listing_status === "draft" && (
+                <button
+                  type="button"
+                  className="admin-btn admin-btn-primary"
+                  onClick={() => runListingAction("submitReview", selectedId)}
+                >
+                  Submit for review
+                </button>
+              )}
+              {selectedId && isOwnerMode && activity.listing_status === "published" && (
+                <button
+                  type="button"
+                  className="admin-btn"
+                  onClick={() => runListingAction("delist", selectedId)}
+                >
+                  Delist
+                </button>
+              )}
+              {selectedId && isSuperAdmin && activity.listing_status === "pending_review" && (
+                <>
+                  <button
+                    type="button"
+                    className="admin-btn admin-btn-primary"
+                    onClick={() => runListingAction("approve", selectedId)}
+                  >
+                    Approve listing
+                  </button>
+                  <button
+                    type="button"
+                    className="admin-btn"
+                    onClick={() => runListingAction("reject", selectedId)}
+                  >
+                    Reject
+                  </button>
+                </>
+              )}
               {selectedId && (
                 <button type="button" className="admin-btn admin-btn-danger" onClick={deleteActivity}>
-                  Delete tour
+                  Delete
                 </button>
               )}
               <button type="button" className="admin-btn" onClick={closeModal}>
                 Cancel
               </button>
             </div>
+            {selectedId && (
+              <p className="admin-hint" style={{ marginTop: "0.75rem" }}>
+                Status:{" "}
+                <span className={`admin-badge ${listingBadgeClass(activity.listing_status)}`}>
+                  {LISTING_STATUS_LABELS[activity.listing_status]}
+                </span>
+              </p>
+            )}
           </form>
 
-          {selectedId && (
-            <div className="admin-ticket-list">
-              <h3>Ticket types (Adults, Children, Group, etc.)</h3>
-              {tickets.map((t) => (
-                <div className="admin-ticket-row" key={t.id}>
-                  <div>
-                    <strong>{t.name}</strong>
-                    {t.subtitle && <div style={{ color: "#5c6570", fontSize: "0.85rem" }}>{t.subtitle}</div>}
-                    <div>{formatMoney(t.price_cents)}</div>
-                  </div>
-                  <div className="admin-actions" style={{ margin: 0 }}>
-                    <button type="button" className="admin-btn admin-btn-sm" onClick={() => editTicket(t)}>
-                      Edit
-                    </button>
-                    <button
-                      type="button"
-                      className="admin-btn admin-btn-sm admin-btn-danger"
-                      onClick={() => deleteTicket(t.id)}
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              ))}
-
-              <form onSubmit={saveTicket} style={{ marginTop: "1rem" }}>
-                <h4>{editingTicketId ? "Edit ticket" : "Add ticket type"}</h4>
-                <div className="admin-form-grid">
-                  <div className="admin-field">
-                    <label>Name *</label>
-                    <input
-                      required
-                      value={ticketForm.name}
-                      onChange={(e) => setTicketForm({ ...ticketForm, name: e.target.value })}
-                      placeholder="Adults — Ages 13 & Up"
-                    />
-                  </div>
-                  <div className="admin-field">
-                    <label>Price ($)</label>
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      required
-                      value={ticketForm.price_dollars}
-                      onChange={(e) =>
-                        setTicketForm({ ...ticketForm, price_dollars: e.target.value })
-                      }
-                      placeholder="55.55"
-                    />
-                  </div>
-                  <div className="admin-field full">
-                    <label>Subtitle / notes</label>
-                    <input
-                      value={ticketForm.subtitle}
-                      onChange={(e) => setTicketForm({ ...ticketForm, subtitle: e.target.value })}
-                      placeholder="Save 10% when booking 6+ together"
-                    />
-                  </div>
-                  <div className="admin-field">
-                    <label>Sort order</label>
-                    <input
-                      type="number"
-                      value={ticketForm.sort_order}
-                      onChange={(e) =>
-                        setTicketForm({ ...ticketForm, sort_order: Number(e.target.value) })
-                      }
-                    />
-                  </div>
-                  <div className="admin-field">
-                    <label>Max per booking</label>
-                    <input
-                      type="number"
-                      min={1}
-                      value={ticketForm.max_per_booking ?? ""}
-                      onChange={(e) =>
-                        setTicketForm({
-                          ...ticketForm,
-                          max_per_booking: e.target.value ? Number(e.target.value) : null,
-                        })
-                      }
-                    />
-                  </div>
-                </div>
-                <div className="admin-actions">
-                  <button type="submit" className="admin-btn admin-btn-primary">
-                    {editingTicketId ? "Update ticket" : "Add ticket"}
-                  </button>
-                  {editingTicketId && (
-                    <button
-                      type="button"
-                      className="admin-btn"
-                      onClick={() => {
-                        setEditingTicketId(null);
-                        setTicketForm(emptyTicket);
-                      }}
-                    >
-                      Cancel edit
-                    </button>
-                  )}
-                </div>
-              </form>
-            </div>
-          )}
       </AdminModal>
     </>
   );

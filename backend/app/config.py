@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     stripe_publishable_key: str = ""
     frontend_url: str = "http://localhost:5173"
     tax_rate_percent: float = 13.0
+    platform_fee_percent: float = 15.0
     booking_hold_minutes: int = 3
     default_booking_cutoff_hours: int = 2
     site_timezone: str = "America/New_York"
@@ -34,9 +35,13 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("ADMIN_JWT_SECRET", "ADMIN_API_KEY"),
     )
     admin_jwt_expire_minutes: int = 30
+    renter_jwt_expire_minutes: int = 60 * 24 * 7  # 7 days — guest marketplace sessions
     admin_login_max_attempts: int = 5
     admin_login_window_seconds: int = 900
     require_strong_admin_secrets: bool = False
+    super_admin_email: str = "admin@localhost"
+    super_admin_password: str = ""
+    google_client_id: str = ""
 
 
 settings = Settings()

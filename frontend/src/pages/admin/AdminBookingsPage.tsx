@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { admin, type AdminBooking } from "../../admin/adminApi";
+import AdminBookingDetailModal from "./AdminBookingDetailModal";
 import { formatMoney } from "../../utils";
 
 const STATUS_OPTIONS = ["", "paid", "pending", "cancelled", "expired", "waitlist"];
@@ -15,6 +16,7 @@ export default function AdminBookingsPage() {
   const [list, setList] = useState<AdminBooking[]>([]);
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
+  const [viewId, setViewId] = useState<number | null>(null);
 
   function load() {
     admin.bookings
@@ -32,8 +34,22 @@ export default function AdminBookingsPage() {
 
   async function cancelBooking(id: number, ref: string) {
     if (!confirm(`Cancel booking ${ref}?`)) return;
+    const fullRefund = confirm(
+      `Issue a full refund (weather or owner cancellation)?\n\n` +
+        `OK = Full refund to customer\n` +
+        `Cancel = Apply standard cancellation policy`
+    );
+    const reason = fullRefund
+      ? "Weather or owner cancellation"
+      : prompt("Optional reason for cancellation:", "") || undefined;
     try {
-      await admin.bookings.cancel(id);
+      const result = await admin.bookings.cancel(id, {
+        full_refund: fullRefund,
+        reason,
+      });
+      setError("");
+      setViewId(null);
+      alert(result.message || `Booking ${ref} cancelled`);
       load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Cancel failed");
@@ -66,8 +82,8 @@ export default function AdminBookingsPage() {
             <tr>
               <th>Reference</th>
               <th>Customer</th>
-              <th>Trip</th>
-              <th>Tickets</th>
+              <th>Boat</th>
+              <th>Details</th>
               <th>Total</th>
               <th>Status</th>
               <th></th>
@@ -95,28 +111,46 @@ export default function AdminBookingsPage() {
                   </div>
                 </td>
                 <td>
-                  {b.items.map((i) => (
-                    <div key={i.ticket_name}>
-                      {i.quantity}× {i.ticket_name}
-                    </div>
-                  ))}
+                  {b.items.length > 0 ? (
+                    b.items.map((i) => (
+                      <div key={i.ticket_name}>
+                        {i.quantity}× {i.ticket_name}
+                      </div>
+                    ))
+                  ) : (
+                    <span style={{ color: "#5c6570" }}>Boat rental</span>
+                  )}
                 </td>
                 <td>{formatMoney(b.total_cents)}</td>
                 <td>
                   <span className={`admin-badge ${statusBadge(b.status, b.is_waitlist)}`}>
                     {b.is_waitlist ? "waitlist" : b.status}
                   </span>
+                  {b.status === "cancelled" && b.refund_cents > 0 && (
+                    <div style={{ fontSize: "0.8rem", marginTop: 4 }}>
+                      Refunded {formatMoney(b.refund_cents)}
+                    </div>
+                  )}
                 </td>
                 <td>
-                  {b.status !== "cancelled" && (
+                  <div className="admin-table-actions">
                     <button
                       type="button"
-                      className="admin-btn admin-btn-sm admin-btn-danger"
-                      onClick={() => cancelBooking(b.id, b.reference)}
+                      className="admin-btn admin-btn-sm"
+                      onClick={() => setViewId(b.id)}
                     >
-                      Cancel
+                      View
                     </button>
-                  )}
+                    {b.status !== "cancelled" && b.status !== "expired" && (
+                      <button
+                        type="button"
+                        className="admin-btn admin-btn-sm admin-btn-danger"
+                        onClick={() => cancelBooking(b.id, b.reference)}
+                      >
+                        Cancel
+                      </button>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}
@@ -124,6 +158,13 @@ export default function AdminBookingsPage() {
         </table>
         {list.length === 0 && <p className="admin-hint">No bookings found.</p>}
       </section>
+
+      <AdminBookingDetailModal
+        bookingId={viewId}
+        open={viewId != null}
+        onClose={() => setViewId(null)}
+        onCancel={cancelBooking}
+      />
     </>
   );
 }

@@ -148,6 +148,36 @@ STRIPE_WEBHOOK_SECRET=whsec_xxxxxxxx
 
 **Restart Terminal 1** (backend) after updating `.env` so the new secret is loaded.
 
+### Terminal 4 (optional) — Public URL with ngrok
+
+Share the app over the internet (demo on a phone, Stripe Connect return URLs, etc.):
+
+```bash
+# One-time: add your ngrok authtoken (from https://dashboard.ngrok.com)
+ngrok config add-authtoken YOUR_TOKEN
+
+# With backend + frontend already running:
+./scripts/ngrok-tunnel.sh
+```
+
+The script prints your public `https://….ngrok-free.app` URL, updates `FRONTEND_URL` in `backend/.env`, and keeps the tunnel open. **Restart the backend** after the URL is written.
+
+Alternatively, from `frontend/`:
+
+```bash
+npm run tunnel
+```
+
+(then set `FRONTEND_URL` manually to the ngrok URL shown at http://127.0.0.1:4040)
+
+**Notes:**
+
+- Two tunnels are started: **web** (port 5173, share this URL) and **api** (port 8000). The script writes `frontend/.env.local` so the browser talks to the backend directly.
+- CORS already allows `*.ngrok-free.app`, `*.ngrok.io`, and `*.ngrok.app`.
+- Keep **Stripe CLI** forwarding to `localhost:8000` (no need to tunnel the API for webhooks).
+- For **Google Sign-In**, add your ngrok URL to **Authorized JavaScript origins** in [Google Cloud Console](https://console.cloud.google.com/apis/credentials).
+- For a **stable URL** on each run, set a reserved domain in `ngrok.yml` (paid ngrok plan).
+
 ---
 
 ## Test the booking flow
@@ -340,6 +370,7 @@ If React is served at `yoursite.com/book/`:
 |---------|-------------|
 | `npm install` | Install Node dependencies |
 | `npm run dev` | Start dev server at http://localhost:5173 |
+| `npm run tunnel` | Expose dev server via ngrok (see [Terminal 4](#terminal-4-optional--public-url-with-ngrok)) |
 | `npm run build` | Production build → `frontend/dist/` |
 | `npm run preview` | Preview production build locally |
 
@@ -363,6 +394,8 @@ If React is served at `yoursite.com/book/`:
 | **Payment succeeds but seats not confirmed** | Run `stripe listen` (Terminal 3) and set `STRIPE_WEBHOOK_SECRET` in `.env`, then restart API. |
 | **`ImportError: cannot import name 'UTC'`** | Use Python 3.10+ (project uses `timezone.utc` compatibility shim). |
 | **CORS errors in browser** | Add your frontend URL to `FRONTEND_URL` in `backend/.env`. |
+| **ngrok “Visit Site” interstitial** | Normal on free tier; click through once per browser session. |
+| **Google Sign-In fails on ngrok URL** | Add the ngrok `https://…` origin in Google Cloud credentials. |
 | **Port 8000 already in use** | Stop the other process or run `uvicorn app.main:app --reload --port 8001` and update Vite proxy in `frontend/vite.config.ts`. |
 | **Port 5173 already in use** | Run `npm run dev -- --port 5174` |
 

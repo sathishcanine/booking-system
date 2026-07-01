@@ -2,8 +2,8 @@ from app.config import settings
 from app.models import PromoCode
 
 
-def calc_tax(subtotal_after_discount_cents: int) -> int:
-    rate = settings.tax_rate_percent / 100.0
+def calc_tax(subtotal_after_discount_cents: int, tax_rate_percent: float | None = None) -> int:
+    rate = (tax_rate_percent if tax_rate_percent is not None else settings.tax_rate_percent) / 100.0
     return int(round(subtotal_after_discount_cents * rate))
 
 

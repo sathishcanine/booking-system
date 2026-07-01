@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link, useLocation } from "react-router-dom";
 import { admin, type AdminDashboard } from "../../admin/adminApi";
-import { formatMoney, formatTime } from "../../utils";
+import { formatMoney } from "../../utils";
 
 function pctWidth(value: number, max: number) {
   if (max <= 0) return 0;
@@ -17,7 +17,20 @@ function statusClass(status: string, waitlist: boolean) {
 
 function RevenueChart({ days }: { days: AdminDashboard["revenue_by_day"] }) {
   const maxRev = Math.max(...days.map((d) => d.revenue_cents), 1);
+  const hasRevenue = days.some((d) => d.revenue_cents > 0);
   const showLabels = days.length <= 14;
+
+  if (!hasRevenue) {
+    return (
+      <div className="dash-chart-empty">
+        <span className="dash-chart-empty__icon" aria-hidden>
+          📈
+        </span>
+        <p>No paid revenue in this period yet.</p>
+        <small>Bars will appear as customers complete bookings.</small>
+      </div>
+    );
+  }
 
   return (
     <div className="dash-chart dash-chart--revenue">
@@ -32,14 +45,44 @@ function RevenueChart({ days }: { days: AdminDashboard["revenue_by_day"] }) {
             <div className="dash-bar-col" key={d.date} title={`${label}: ${formatMoney(d.revenue_cents)}`}>
               <div className="dash-bar-wrap">
                 <div
-                  className="dash-bar dash-bar--revenue"
-                  style={{ height: `${Math.max(h, d.revenue_cents > 0 ? 4 : 0)}%` }}
+                  className={`dash-bar dash-bar--revenue${d.revenue_cents > 0 ? " dash-bar--active" : ""}`}
+                  style={{ height: `${Math.max(h, d.revenue_cents > 0 ? 6 : 0)}%` }}
                 />
               </div>
               {showLabels && <span className="dash-bar-label">{label.split(" ")[1]}</span>}
             </div>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+function StatusBreakdown({ items }: { items: AdminDashboard["bookings_by_status"] }) {
+  const total = items.reduce((sum, s) => sum + s.count, 0);
+  if (total === 0) {
+    return <p className="admin-hint">No bookings yet.</p>;
+  }
+
+  return (
+    <div className="dash-status">
+      <div className="dash-status-bar" aria-hidden>
+        {items.map((s) => (
+          <span
+            key={s.status}
+            className={`dash-status-segment dash-status-segment--${s.status}`}
+            style={{ width: `${(s.count / total) * 100}%` }}
+          />
+        ))}
+      </div>
+      <div className="dash-donut-legend">
+        {items.map((s) => (
+          <div className="dash-legend-row" key={s.status}>
+            <span className={`admin-badge ${statusClass(s.status, false)}`}>{s.status}</span>
+            <strong>{s.count}</strong>
+            <span className="dash-legend-pct">{Math.round((s.count / total) * 100)}%</span>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -72,6 +115,14 @@ function HorizontalBars({
   );
 }
 
+const KPI_ICONS: Record<string, string> = {
+  green: "◆",
+  blue: "◇",
+  orange: "◎",
+  purple: "✦",
+  warn: "◷",
+};
+
 function KpiCard({
   label,
   value,
@@ -83,16 +134,31 @@ function KpiCard({
   sub?: string;
   accent?: "green" | "blue" | "orange" | "purple" | "warn";
 }) {
+  const tone = accent || "blue";
   return (
-    <article className={`dash-kpi dash-kpi--${accent || "blue"}`}>
-      <span className="dash-kpi-label">{label}</span>
-      <strong className="dash-kpi-value">{value}</strong>
-      {sub && <span className="dash-kpi-sub">{sub}</span>}
+    <article className={`dash-kpi dash-kpi--${tone}`}>
+      <span className="dash-kpi-icon" aria-hidden>
+        {KPI_ICONS[tone]}
+      </span>
+      <div className="dash-kpi-body">
+        <span className="dash-kpi-label">{label}</span>
+        <strong className="dash-kpi-value">{value}</strong>
+        {sub && <span className="dash-kpi-sub">{sub}</span>}
+      </div>
     </article>
   );
 }
 
+type DashboardScope = "overall" | "own";
+
 export default function AdminDashboardPage() {
+  const location = useLocation();
+  const basePath = useMemo(
+    () => (location.pathname.startsWith("/owner") ? "/owner" : "/admin"),
+    [location.pathname]
+  );
+  const isPlatformAdmin = basePath === "/admin";
+  const [scope, setScope] = useState<DashboardScope>("overall");
   const [stats, setStats] = useState<AdminDashboard | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -101,11 +167,11 @@ export default function AdminDashboardPage() {
     setLoading(true);
     setError("");
     admin
-      .dashboard()
+      .dashboard(isPlatformAdmin ? scope : "overall")
       .then(setStats)
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
-  }, []);
+  }, [isPlatformAdmin, scope]);
 
   useEffect(() => {
     load();
@@ -117,31 +183,76 @@ export default function AdminDashboardPage() {
     : 0;
 
   return (
-    <>
-      <header className="admin-topbar">
-        <div>
-          <h1>Analytics dashboard</h1>
+    <div className="dash-page">
+      <header className="dash-hero">
+        <div className="dash-hero__text">
+          <p className="dash-hero__eyebrow">{isPlatformAdmin ? "Platform" : "Owner"}</p>
+          <h1>{isPlatformAdmin ? "Marketplace dashboard" : "Analytics dashboard"}</h1>
+          {isPlatformAdmin && (
+            <div className="dash-scope-toggle" role="group" aria-label="Dashboard scope">
+              <button
+                type="button"
+                className={`dash-scope-btn${scope === "overall" ? " dash-scope-btn--active" : ""}`}
+                aria-pressed={scope === "overall"}
+                onClick={() => setScope("overall")}
+              >
+                Overall
+              </button>
+              <button
+                type="button"
+                className={`dash-scope-btn${scope === "own" ? " dash-scope-btn--active" : ""}`}
+                aria-pressed={scope === "own"}
+                onClick={() => setScope("own")}
+              >
+                Own boats
+              </button>
+            </div>
+          )}
           {updated && (
-            <p className="admin-hint" style={{ margin: "0.25rem 0 0" }}>
-              Updated {updated}
+            <p className="dash-hero__meta">
+              {isPlatformAdmin
+                ? scope === "overall"
+                  ? "All owners · "
+                  : "Your boats · "
+                : ""}
+              Last updated {updated}
             </p>
           )}
         </div>
-        <div className="admin-actions" style={{ margin: 0 }}>
-          <button type="button" className="admin-btn" onClick={load} disabled={loading}>
-            {loading ? "Refreshing…" : "Refresh"}
+        <div className="dash-hero__actions">
+          <button type="button" className="admin-btn dash-btn-ghost" onClick={load} disabled={loading}>
+            {loading ? "Refreshing…" : "↻ Refresh"}
           </button>
-          <Link to="/admin/slots" className="admin-btn admin-btn-primary">
-            + Add departure
+          <Link to={`${basePath}/activities`} className="admin-btn admin-btn-primary">
+            {isPlatformAdmin ? "Manage boats" : "+ Add boat"}
           </Link>
         </div>
       </header>
 
       {error && <p className="admin-error">{error}</p>}
-      {loading && !stats && <p className="admin-hint">Loading analytics…</p>}
+      {loading && !stats && (
+        <div className="dash-loading">
+          <div className="dash-loading__pulse" />
+          <p>Loading analytics…</p>
+        </div>
+      )}
 
       {stats && (
         <>
+          {((!isPlatformAdmin && stats.activity_count === 0) ||
+            (isPlatformAdmin && scope === "own" && stats.activity_count === 0)) && (
+            <section className="admin-card dash-welcome">
+              <h2>Welcome — list your first boat</h2>
+              <p className="admin-hint">
+                Your dashboard is empty. Add a boat listing to start receiving bookings and
+                revenue here.
+              </p>
+              <Link to={`${basePath}/activities`} className="admin-btn admin-btn-primary">
+                + Add boat
+              </Link>
+            </section>
+          )}
+
           <section className="dash-kpi-grid">
             <KpiCard
               accent="green"
@@ -163,9 +274,9 @@ export default function AdminDashboardPage() {
             />
             <KpiCard
               accent="purple"
-              label="Tickets sold"
+              label="Guests booked"
               value={String(stats.tickets_sold)}
-              sub={`Avg order ${formatMoney(stats.average_order_cents)}`}
+              sub={`Avg booking ${formatMoney(stats.average_order_cents)}`}
             />
             <KpiCard
               accent="green"
@@ -181,35 +292,29 @@ export default function AdminDashboardPage() {
             />
             <KpiCard
               accent="purple"
-              label="Waitlist"
-              value={String(stats.waitlist_count)}
-              sub={`${stats.waitlist_departures} full departures`}
-            />
-            <KpiCard
-              accent="orange"
-              label="Upcoming fill rate"
-              value={`${stats.upcoming_fill_rate_percent}%`}
-              sub={`${stats.upcoming_spots_remaining} spots left of ${stats.upcoming_capacity}`}
+              label="Listed boats"
+              value={String(stats.activity_count)}
+              sub={`${stats.paid_booking_count} paid rentals`}
             />
           </section>
 
           <section className="dash-grid-2">
-            <div className="admin-card dash-panel">
-              <h2>Revenue — last 30 days</h2>
+            <div className="admin-card dash-panel dash-panel--chart">
+              <div className="dash-panel__head">
+                <h2>Revenue — last 30 days</h2>
+                <span className="dash-panel__tag">30d</span>
+              </div>
               <RevenueChart days={stats.revenue_by_day} />
-              <p className="dash-panel-foot">Peak day: {formatMoney(peakRevenue)}</p>
+              <p className="dash-panel-foot">
+                Peak day <strong>{formatMoney(peakRevenue)}</strong>
+              </p>
             </div>
 
             <div className="admin-card dash-panel">
-              <h2>Bookings by status</h2>
-              <div className="dash-donut-legend">
-                {stats.bookings_by_status.map((s) => (
-                  <div className="dash-legend-row" key={s.status}>
-                    <span className={`admin-badge ${statusClass(s.status, false)}`}>{s.status}</span>
-                    <strong>{s.count}</strong>
-                  </div>
-                ))}
+              <div className="dash-panel__head">
+                <h2>Bookings by status</h2>
               </div>
+              <StatusBreakdown items={stats.bookings_by_status} />
               <div className="dash-mini-stats">
                 <span>Cancelled: {stats.cancelled_count}</span>
                 <span>Expired holds: {stats.expired_count}</span>
@@ -221,7 +326,9 @@ export default function AdminDashboardPage() {
 
           <section className="dash-grid-2">
             <div className="admin-card dash-panel">
-              <h2>Top tours (revenue)</h2>
+              <div className="dash-panel__head">
+                <h2>Top boats (revenue)</h2>
+              </div>
               {stats.top_tours.length === 0 ? (
                 <p className="admin-hint">No paid bookings yet.</p>
               ) : (
@@ -236,24 +343,23 @@ export default function AdminDashboardPage() {
             </div>
 
             <div className="admin-card dash-panel">
-              <h2>Top ticket types</h2>
-              {stats.top_ticket_types.length === 0 ? (
-                <p className="admin-hint">No ticket sales yet.</p>
-              ) : (
-                <HorizontalBars
-                  items={stats.top_ticket_types.map((t) => ({
-                    label: t.name,
-                    value: t.quantity_sold,
-                  }))}
-                  formatValue={(n) => `${n} sold`}
-                />
-              )}
+              <div className="dash-panel__head">
+                <h2>Booking funnel</h2>
+              </div>
+              <div className="dash-mini-stats" style={{ marginTop: 0 }}>
+                <span>Conversion: {stats.conversion_rate_percent}%</span>
+                <span>Waitlist: {stats.waitlist_count}</span>
+                <span>Promo used: {stats.promo_booking_count}</span>
+                <span>Email opt-in: {stats.marketing_opt_in_rate_percent}%</span>
+              </div>
             </div>
           </section>
 
           <section className="dash-grid-2">
             <div className="admin-card dash-panel">
-              <h2>How customers heard about you</h2>
+              <div className="dash-panel__head">
+                <h2>How customers heard about you</h2>
+              </div>
               {Object.keys(stats.heard_about).length === 0 ? (
                 <p className="admin-hint">No survey data yet.</p>
               ) : (
@@ -267,7 +373,9 @@ export default function AdminDashboardPage() {
             </div>
 
             <div className="admin-card dash-panel">
-              <h2>Promo codes used</h2>
+              <div className="dash-panel__head">
+                <h2>Promo codes used</h2>
+              </div>
               {stats.top_promos.length === 0 ? (
                 <p className="admin-hint">No promo usage yet.</p>
               ) : (
@@ -279,93 +387,19 @@ export default function AdminDashboardPage() {
             </div>
           </section>
 
-          <section className="dash-grid-2">
-            <div className="admin-card dash-panel">
-              <h2>Schedule health</h2>
-              <div className="dash-health-grid">
-                <div>
-                  <strong>{stats.upcoming_departure_count}</strong>
-                  <span>Upcoming departures</span>
-                </div>
-                <div>
-                  <strong>{stats.low_stock_departures}</strong>
-                  <span>Low stock (≤8 left)</span>
-                </div>
-                <div>
-                  <strong>{stats.call_to_book_departures}</strong>
-                  <span>Call to book</span>
-                </div>
-                <div>
-                  <strong>{stats.activity_count}</strong>
-                  <span>Active tours</span>
-                </div>
-                <div>
-                  <strong>{stats.upcoming_held_seats}</strong>
-                  <span>Seats on hold (checkout)</span>
-                </div>
-                <div>
-                  <strong>{stats.upcoming_booked}</strong>
-                  <span>Seats confirmed</span>
-                </div>
-              </div>
-              <Link to="/admin/slots" className="admin-btn admin-btn-sm" style={{ marginTop: "1rem" }}>
-                Manage departures →
+          <section className="admin-card dash-panel dash-panel--table">
+            <div className="dash-panel-head">
+              <h2>Recent bookings</h2>
+              <Link to={`${basePath}/bookings`} className="dash-link">
+                View all →
               </Link>
             </div>
-
-            <div className="admin-card dash-panel">
-              <h2>Next departures</h2>
-              <table className="admin-table dash-compact-table">
-                <thead>
-                  <tr>
-                    <th>When</th>
-                    <th>Tour</th>
-                    <th>Fill</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {stats.upcoming_departures.map((s) => (
-                    <tr key={s.slot_id}>
-                      <td>
-                        {new Date(s.starts_at).toLocaleDateString(undefined, {
-                          weekday: "short",
-                          month: "short",
-                          day: "numeric",
-                        })}{" "}
-                        {formatTime(s.starts_at)}
-                      </td>
-                      <td>
-                        {s.activity_title}
-                        {s.is_call_to_book && (
-                          <span className="admin-badge admin-badge-pending"> Call</span>
-                        )}
-                      </td>
-                      <td>
-                        <div className="dash-fill-cell">
-                          <div className="dash-fill-bar">
-                            <span style={{ width: `${s.fill_percent}%` }} />
-                          </div>
-                          <small>{s.spots_left} left</small>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </section>
-
-          <section className="admin-card dash-panel">
-            <div className="dash-panel-head">
-              <h2 style={{ margin: 0 }}>Recent bookings</h2>
-              <Link to="/admin/bookings">View all →</Link>
-            </div>
-            <table className="admin-table">
+            <table className="admin-table dash-recent-table">
               <thead>
                 <tr>
                   <th>Reference</th>
                   <th>Customer</th>
-                  <th>Trip</th>
+                  <th>Boat</th>
                   <th>Total</th>
                   <th>Status</th>
                 </tr>
@@ -374,8 +408,8 @@ export default function AdminDashboardPage() {
                 {stats.recent_bookings.map((b) => (
                   <tr key={b.id}>
                     <td>
-                      <strong>{b.reference}</strong>
-                      <div style={{ fontSize: "0.8rem", color: "#5c6570" }}>
+                      <strong className="dash-ref">{b.reference}</strong>
+                      <div className="dash-ref-time">
                         {new Date(b.created_at).toLocaleString()}
                       </div>
                     </td>
@@ -395,6 +429,6 @@ export default function AdminDashboardPage() {
           </section>
         </>
       )}
-    </>
+    </div>
   );
 }

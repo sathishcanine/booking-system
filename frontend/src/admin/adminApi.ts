@@ -1,6 +1,14 @@
+import { apiFetch } from "../lib/apiFetch";
+
 const API = import.meta.env.VITE_API_URL || "";
 const TOKEN_KEY = "coastal_admin_token";
 const EXPIRES_KEY = "coastal_admin_expires_at";
+const ROLE_KEY = "coastal_auth_role";
+const ORG_NAME_KEY = "coastal_auth_org_name";
+const DISPLAY_NAME_KEY = "coastal_auth_display_name";
+const EMAIL_KEY = "coastal_auth_email";
+
+export type AuthRole = "owner" | "super_admin";
 
 function isTokenExpired(): boolean {
   const raw = localStorage.getItem(EXPIRES_KEY);
@@ -30,6 +38,27 @@ export function setAdminToken(token: string, expiresInSeconds: number) {
 export function clearAdminToken() {
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(EXPIRES_KEY);
+  localStorage.removeItem(ROLE_KEY);
+  localStorage.removeItem(ORG_NAME_KEY);
+  localStorage.removeItem(DISPLAY_NAME_KEY);
+  localStorage.removeItem(EMAIL_KEY);
+}
+
+export function getAuthRole(): AuthRole | null {
+  const role = localStorage.getItem(ROLE_KEY);
+  return role === "owner" || role === "super_admin" ? role : null;
+}
+
+export function getAuthOrgName(): string | null {
+  return localStorage.getItem(ORG_NAME_KEY);
+}
+
+export function getAuthDisplayName(): string | null {
+  return localStorage.getItem(DISPLAY_NAME_KEY);
+}
+
+export function getAuthEmail(): string | null {
+  return localStorage.getItem(EMAIL_KEY);
 }
 
 /** Seconds until the stored session expires (0 if missing/expired). */
@@ -68,10 +97,12 @@ async function adminFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
     ...(init.headers as Record<string, string>),
   };
   if (token) headers.Authorization = `Bearer ${token}`;
-  if (init.body && !headers["Content-Type"]) {
+  const isFormData =
+    typeof FormData !== "undefined" && init.body instanceof FormData;
+  if (init.body && !headers["Content-Type"] && !isFormData) {
     headers["Content-Type"] = "application/json";
   }
-  const r = await fetch(`${API}${path}`, { ...init, headers });
+  const r = await apiFetch(`${API}${path}`, { ...init, headers });
   if (r.status === 401) {
     clearAdminToken();
     throw new Error("Session expired — please sign in again");
@@ -162,16 +193,63 @@ export type AdminDashboard = {
   }[];
 };
 
+export type ListingStatus = "draft" | "pending_review" | "published" | "delisted";
+
+export const LISTING_STATUS_LABELS: Record<ListingStatus, string> = {
+  draft: "Draft",
+  pending_review: "Pending review",
+  published: "Live",
+  delisted: "Delisted",
+};
+
+export const BOAT_TYPES = [
+  { value: "pontoon", label: "Pontoon" },
+  { value: "deck_boat", label: "Deck boat" },
+  { value: "yacht", label: "Yacht" },
+  { value: "sailboat", label: "Sailboat" },
+  { value: "fishing", label: "Fishing boat" },
+  { value: "jet_ski", label: "Jet ski / PWC" },
+  { value: "catamaran", label: "Catamaran" },
+  { value: "other", label: "Other" },
+] as const;
+
+export const MARKETPLACE_CATEGORIES = [
+  { id: "watersports", label: "Watersports" },
+  { id: "fishing", label: "Fishing" },
+  { id: "sailing", label: "Sailing" },
+  { id: "cruising", label: "Cruising" },
+  { id: "celebrating", label: "Celebrating" },
+] as const;
+
+export const BOAT_AMENITIES = [
+  "GPS",
+  "Bluetooth speakers",
+  "Cooler",
+  "Bimini top",
+  "Restroom",
+  "Snorkel gear",
+  "Wakeboard tower",
+  "Grill",
+] as const;
+
 export type AdminActivityListItem = {
   id: number;
   title: string;
   slug: string;
   location_label: string | null;
+  city: string | null;
   duration_minutes: number;
   is_active: boolean;
+  listing_status: ListingStatus;
+  boat_type: string | null;
+  max_guests: number | null;
+  hourly_rate_cents: number | null;
+  organization_name: string | null;
   ticket_type_count: number;
   slot_count: number;
 };
+
+export type AdminActivityInput = Omit<AdminActivity, "id" | "ticket_types" | "listing_status">;
 
 export type AdminTicketType = {
   id: number;
@@ -194,6 +272,24 @@ export type AdminActivity = {
   emoji: string | null;
   meeting_instructions: string | null;
   is_active: boolean;
+  listing_status: ListingStatus;
+  max_guests: number | null;
+  boat_type: string | null;
+  boat_make: string;
+  boat_model: string;
+  marina_name: string | null;
+  city: string | null;
+  state: string | null;
+  amenities: string[];
+  photo_urls: string[];
+  captain_required: boolean;
+  hourly_rate_cents: number | null;
+  length_ft: number | null;
+  min_rental_hours: number;
+  max_rental_hours: number;
+  instant_book: boolean;
+  bareboat_allowed: boolean;
+  activity_tags: string[];
   ticket_types: AdminTicketType[];
 };
 
@@ -228,6 +324,41 @@ export type AdminPromo = {
   is_active: boolean;
 };
 
+export type AdminOrganization = {
+  id: number;
+  name: string;
+};
+
+export type AdminCaptain = {
+  id: number;
+  organization_id: number;
+  organization_name: string | null;
+  slug: string;
+  name: string;
+  bio: string | null;
+  location: string | null;
+  photo_url: string | null;
+  rating: number | null;
+  review_count: number;
+  trips_completed: number;
+  coast_guard_verified: boolean;
+  phone_verified: boolean;
+  aboard_since_year: number | null;
+  is_active: boolean;
+};
+
+export type AdminCaptainInput = {
+  name: string;
+  slug?: string;
+  bio?: string | null;
+  location?: string | null;
+  photo_url?: string | null;
+  coast_guard_verified: boolean;
+  phone_verified: boolean;
+  is_active: boolean;
+  organization_id?: number | null;
+};
+
 export type AdminBooking = {
   id: number;
   reference: string;
@@ -241,17 +372,138 @@ export type AdminBooking = {
   slot_id: number;
   activity_title: string;
   slot_starts_at: string;
+  refund_cents: number;
+  cancelled_at: string | null;
+  cancelled_by: string | null;
   items: { ticket_name: string; quantity: number; unit_price_cents: number }[];
 };
 
-type AdminAuthResponse = { token: string; expires_in: number; token_type?: string };
+export type AdminBookingDetail = AdminBooking & {
+  booking_kind: string;
+  activity_slug: string | null;
+  organization_name: string | null;
+  rental_starts_at: string | null;
+  duration_hours: number | null;
+  passenger_count: number | null;
+  captain_included: boolean;
+  captain_name: string | null;
+  boat_price_cents: number;
+  captain_price_cents: number;
+  insurance_cents: number;
+  addon_cents: number;
+  subtotal_cents: number;
+  discount_cents: number;
+  tax_cents: number;
+  platform_fee_cents: number;
+  owner_payout_cents: number;
+  promo_code: string | null;
+  cancellation_reason: string | null;
+  stripe_refund_id: string | null;
+  comments: string | null;
+  heard_about: string | null;
+  been_before: string | null;
+  marketing_opt_in: boolean;
+};
+
+export type CancelBookingResult = {
+  ok: boolean;
+  reference: string;
+  status: string;
+  refund_cents: number;
+  message: string | null;
+};
+
+type AdminAuthResponse = {
+  token: string;
+  expires_in: number;
+  token_type?: string;
+  role?: AuthRole;
+  organization_name?: string | null;
+  display_name?: string | null;
+  email?: string | null;
+};
 
 function storeAdminAuth(data: AdminAuthResponse) {
   setAdminToken(data.token, data.expires_in);
+  if (data.role) localStorage.setItem(ROLE_KEY, data.role);
+  if (data.organization_name) {
+    localStorage.setItem(ORG_NAME_KEY, data.organization_name);
+  } else {
+    localStorage.removeItem(ORG_NAME_KEY);
+  }
+  if (data.display_name) {
+    localStorage.setItem(DISPLAY_NAME_KEY, data.display_name);
+  } else {
+    localStorage.removeItem(DISPLAY_NAME_KEY);
+  }
+  if (data.email) localStorage.setItem(EMAIL_KEY, data.email);
+  else localStorage.removeItem(EMAIL_KEY);
+}
+
+export async function ownerRegister(
+  email: string,
+  password: string,
+  organizationName: string
+) {
+  const r = await apiFetch(`${API}/api/auth/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      email,
+      password,
+      organization_name: organizationName,
+    }),
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) {
+    throw new Error(
+      typeof data.detail === "string" ? data.detail : "Registration failed"
+    );
+  }
+  const auth = data as AdminAuthResponse;
+  storeAdminAuth(auth);
+  return auth;
+}
+
+export async function ownerGoogleLogin(credential: string, organizationName?: string) {
+  const r = await apiFetch(`${API}/api/auth/owner/google`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      credential,
+      organization_name: organizationName || undefined,
+    }),
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) {
+    throw new Error(
+      typeof data.detail === "string" ? data.detail : "Google sign-in failed"
+    );
+  }
+  const auth = data as AdminAuthResponse;
+  storeAdminAuth(auth);
+  return auth;
+}
+
+export async function ownerLogin(email: string, password: string) {
+  const r = await apiFetch(`${API}/api/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) {
+    throw new Error(
+      typeof data.detail === "string" ? data.detail : "Invalid email or password"
+    );
+  }
+  const auth = data as AdminAuthResponse;
+  storeAdminAuth(auth);
+  return auth;
 }
 
 export async function adminLogin(password: string) {
-  const r = await fetch(`${API}/api/admin/login`, {
+  const r = await apiFetch(`${API}/api/admin/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ password }),
@@ -262,7 +514,7 @@ export async function adminLogin(password: string) {
       typeof data.detail === "string" ? data.detail : "Invalid password"
     );
   }
-  const auth = data as AdminAuthResponse;
+  const auth = { ...(data as AdminAuthResponse), role: "super_admin" as const };
   storeAdminAuth(auth);
   return auth;
 }
@@ -275,7 +527,7 @@ export async function adminRefreshSession(): Promise<boolean> {
     return false;
   }
   try {
-    const r = await fetch(`${API}/api/admin/refresh`, {
+    const r = await apiFetch(`${API}/api/admin/refresh`, {
       method: "POST",
       headers: { Authorization: `Bearer ${token}` },
     });
@@ -291,17 +543,144 @@ export async function adminRefreshSession(): Promise<boolean> {
   }
 }
 
+export type MarketplacePromiseItem = {
+  title: string;
+  body: string;
+};
+
+export type PlatformSettings = {
+  platform_fee_percent: number;
+  tax_rate_percent: number;
+  cancel_full_refund_hours: number;
+  cancel_partial_refund_hours: number;
+  cancel_partial_refund_percent: number;
+  trip_protection_summary: string | null;
+  marketplace_promise_title: string | null;
+  marketplace_promise_items: MarketplacePromiseItem[] | null;
+  destination_best_title_template: string | null;
+  destination_type_title_template: string | null;
+};
+
+export type AdminReview = {
+  id: number;
+  rating: number;
+  body: string | null;
+  reviewer_name: string;
+  created_at: string;
+  owner_response: string | null;
+  owner_response_at: string | null;
+  activity_id: number;
+  activity_title: string;
+  booking_reference: string;
+};
+
+export type ConnectStatus = {
+  stripe_configured: boolean;
+  account_id: string | null;
+  charges_enabled: boolean;
+  payouts_enabled: boolean;
+  details_submitted: boolean;
+  ready_for_payments: boolean;
+  dashboard_url: string | null;
+};
+
+export type EarningsBooking = {
+  id: number;
+  reference: string;
+  customer_name: string;
+  total_cents: number;
+  platform_fee_cents: number;
+  owner_payout_cents: number;
+  tax_cents: number;
+  created_at: string;
+  activity_title: string;
+};
+
+export type Earnings = {
+  gross_revenue_cents: number;
+  platform_fees_cents: number;
+  net_earnings_cents: number;
+  tax_collected_cents: number;
+  paid_booking_count: number;
+  connect: ConnectStatus | null;
+  recent_bookings: EarningsBooking[];
+};
+
+export const connectApi = {
+  status: () => adminFetch<ConnectStatus>("/api/connect/status"),
+  onboard: () =>
+    adminFetch<{ url: string }>("/api/connect/onboard", { method: "POST" }),
+  refresh: () =>
+    adminFetch<ConnectStatus>("/api/connect/refresh", { method: "POST" }),
+};
+
+export async function uploadListingPhoto(file: File): Promise<{ url: string }> {
+  const token = getAdminToken();
+  const body = new FormData();
+  body.append("file", file);
+  const headers: Record<string, string> = {};
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const r = await apiFetch(`${API}/api/admin/uploads/listing-photo`, {
+    method: "POST",
+    headers,
+    body,
+  });
+  const data = await r.json().catch(() => ({}));
+  if (r.status === 401) {
+    clearAdminToken();
+    throw new Error("Session expired — please sign in again");
+  }
+  if (!r.ok) {
+    throw new Error(formatApiError(data, r.status));
+  }
+  return data as { url: string };
+}
+
+export async function uploadCaptainPhoto(file: File): Promise<{ url: string }> {
+  const token = getAdminToken();
+  const body = new FormData();
+  body.append("file", file);
+  const headers: Record<string, string> = {};
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const r = await apiFetch(`${API}/api/admin/uploads/captain-photo`, {
+    method: "POST",
+    headers,
+    body,
+  });
+  const data = await r.json().catch(() => ({}));
+  if (r.status === 401) {
+    clearAdminToken();
+    throw new Error("Session expired — please sign in again");
+  }
+  if (!r.ok) {
+    throw new Error(formatApiError(data, r.status));
+  }
+  return data as { url: string };
+}
+
 export const admin = {
-  dashboard: () => adminFetch<AdminDashboard>("/api/admin/dashboard"),
+  dashboard: (scope: "overall" | "own" = "overall") =>
+    adminFetch<AdminDashboard>(
+      scope === "own" ? "/api/admin/dashboard?scope=own" : "/api/admin/dashboard"
+    ),
+  earnings: () => adminFetch<Earnings>("/api/admin/earnings"),
+  platformSettings: {
+    get: () => adminFetch<PlatformSettings>("/api/admin/platform-settings"),
+    update: (body: PlatformSettings) =>
+      adminFetch<PlatformSettings>("/api/admin/platform-settings", {
+        method: "PATCH",
+        body: JSON.stringify(body),
+      }),
+  },
   activities: {
     list: () => adminFetch<AdminActivityListItem[]>("/api/admin/activities"),
     get: (id: number) => adminFetch<AdminActivity>(`/api/admin/activities/${id}`),
-    create: (body: Omit<AdminActivity, "id" | "ticket_types">) =>
+    create: (body: AdminActivityInput) =>
       adminFetch<AdminActivity>("/api/admin/activities", {
         method: "POST",
         body: JSON.stringify(body),
       }),
-    update: (id: number, body: Omit<AdminActivity, "id" | "ticket_types">) =>
+    update: (id: number, body: AdminActivityInput) =>
       adminFetch<AdminActivity>(`/api/admin/activities/${id}`, {
         method: "PUT",
         body: JSON.stringify(body),
@@ -311,6 +690,22 @@ export const admin = {
         `/api/admin/activities/${id}`,
         { method: "DELETE" }
       ),
+    submitReview: (id: number) =>
+      adminFetch<AdminActivity>(`/api/admin/activities/${id}/submit-review`, {
+        method: "POST",
+      }),
+    approve: (id: number) =>
+      adminFetch<AdminActivity>(`/api/admin/activities/${id}/approve`, {
+        method: "POST",
+      }),
+    reject: (id: number) =>
+      adminFetch<AdminActivity>(`/api/admin/activities/${id}/reject`, {
+        method: "POST",
+      }),
+    delist: (id: number) =>
+      adminFetch<AdminActivity>(`/api/admin/activities/${id}/delist`, {
+        method: "POST",
+      }),
   },
   ticketTypes: {
     create: (activityId: number, body: Omit<AdminTicketType, "id" | "activity_id">) =>
@@ -352,6 +747,24 @@ export const admin = {
     restore: (id: number) =>
       adminFetch<{ ok: boolean }>(`/api/admin/slots/${id}/restore`, { method: "POST" }),
   },
+  organizations: {
+    list: () => adminFetch<AdminOrganization[]>("/api/admin/organizations"),
+  },
+  captains: {
+    list: () => adminFetch<AdminCaptain[]>("/api/admin/captains"),
+    create: (body: AdminCaptainInput) =>
+      adminFetch<AdminCaptain>("/api/admin/captains", {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+    update: (id: number, body: AdminCaptainInput) =>
+      adminFetch<AdminCaptain>(`/api/admin/captains/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(body),
+      }),
+    delete: (id: number) =>
+      adminFetch<{ ok: boolean }>(`/api/admin/captains/${id}`, { method: "DELETE" }),
+  },
   promos: {
     list: () => adminFetch<AdminPromo[]>("/api/admin/promos"),
     create: (body: Omit<AdminPromo, "id" | "used_count">) =>
@@ -369,6 +782,14 @@ export const admin = {
     resetUsage: (id: number) =>
       adminFetch<AdminPromo>(`/api/admin/promos/${id}/reset-usage`, { method: "POST" }),
   },
+  reviews: {
+    list: () => adminFetch<AdminReview[]>("/api/admin/reviews"),
+    respond: (id: number, response: string) =>
+      adminFetch<AdminReview>(`/api/admin/reviews/${id}/respond`, {
+        method: "PATCH",
+        body: JSON.stringify({ response }),
+      }),
+  },
   bookings: {
     list: (params?: { status?: string; slot_id?: number }) => {
       const q = new URLSearchParams();
@@ -376,11 +797,15 @@ export const admin = {
       if (params?.slot_id) q.set("slot_id", String(params.slot_id));
       return adminFetch<AdminBooking[]>(`/api/admin/bookings?${q}`);
     },
-    cancel: (id: number) =>
-      adminFetch<{ ok: boolean; reference: string }>(
-        `/api/admin/bookings/${id}/cancel`,
-        { method: "PATCH" }
-      ),
+    get: (id: number) => adminFetch<AdminBookingDetail>(`/api/admin/bookings/${id}`),
+    cancel: (
+      id: number,
+      body?: { reason?: string; full_refund?: boolean }
+    ) =>
+      adminFetch<CancelBookingResult>(`/api/admin/bookings/${id}/cancel`, {
+        method: "PATCH",
+        body: JSON.stringify(body ?? {}),
+      }),
   },
 };
 

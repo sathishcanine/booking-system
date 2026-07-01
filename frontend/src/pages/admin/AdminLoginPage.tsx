@@ -28,8 +28,11 @@ export default function AdminLoginPage() {
   return (
     <div className="admin-login-page">
       <div className="admin-login-card">
-        <h1>Alis-Adventure Admin</h1>
-        <p>Manage tours, departures, ticket prices, and bookings.</p>
+        <h1>Alis platform admin</h1>
+        <p>
+          Manage all owner boats, approve listings, platform fees, and marketplace-wide rental
+          bookings.
+        </p>
         <form onSubmit={onSubmit}>
           <div className="admin-field">
             <label htmlFor="admin-password">Password</label>
@@ -50,7 +53,7 @@ export default function AdminLoginPage() {
           </div>
         </form>
         <p style={{ marginTop: "1.5rem", fontSize: "0.85rem" }}>
-          <Link to="/">← Back to public calendar</Link>
+          <Link to="/boats">← Back to marketplace</Link>
         </p>
       </div>
     </div>

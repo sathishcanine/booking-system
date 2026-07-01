@@ -11,6 +11,55 @@ class AdminLoginOut(BaseModel):
     token: str
     expires_in: int
     token_type: str = "bearer"
+    role: str | None = None
+    organization_id: int | None = None
+    organization_name: str | None = None
+    display_name: str | None = None
+    email: str | None = None
+
+
+class AdminUploadOut(BaseModel):
+    url: str
+
+
+class OwnerRegisterIn(BaseModel):
+    email: str = Field(min_length=3, max_length=200)
+    password: str = Field(min_length=8, max_length=128)
+    organization_name: str = Field(min_length=2, max_length=200)
+
+
+class OwnerLoginIn(BaseModel):
+    email: str = Field(min_length=3, max_length=200)
+    password: str = Field(min_length=1, max_length=128)
+
+
+class RenterRegisterIn(BaseModel):
+    email: str = Field(min_length=3, max_length=200)
+    password: str = Field(min_length=8, max_length=128)
+    display_name: str = Field(min_length=2, max_length=120)
+
+
+class RenterLoginIn(BaseModel):
+    email: str = Field(min_length=3, max_length=200)
+    password: str = Field(min_length=1, max_length=128)
+
+
+class RenterGoogleLoginIn(BaseModel):
+    credential: str = Field(min_length=20)
+
+
+class OwnerGoogleLoginIn(BaseModel):
+    credential: str = Field(min_length=20)
+    organization_name: str | None = Field(default=None, min_length=2, max_length=200)
+
+
+class AuthMeOut(BaseModel):
+    email: str
+    role: str
+    organization_id: int | None = None
+    organization_name: str | None = None
+    organization_status: str | None = None
+    display_name: str | None = None
 
 
 class AdminTicketTypeIn(BaseModel):
@@ -38,10 +87,28 @@ class AdminActivityIn(BaseModel):
     emoji: str | None = None
     meeting_instructions: str | None = None
     is_active: bool = True
+    max_guests: int | None = Field(default=None, ge=1, le=500)
+    boat_type: str | None = Field(default=None, max_length=80)
+    boat_make: str = Field(min_length=1, max_length=80)
+    boat_model: str = Field(min_length=1, max_length=120)
+    marina_name: str | None = Field(default=None, max_length=200)
+    city: str | None = Field(default=None, max_length=120)
+    state: str | None = Field(default=None, max_length=80)
+    amenities: list[str] = Field(default_factory=list)
+    photo_urls: list[str] = Field(default_factory=list)
+    captain_required: bool = False
+    hourly_rate_cents: int | None = Field(default=None, ge=0)
+    length_ft: int | None = Field(default=None, ge=1, le=500)
+    min_rental_hours: int = Field(default=2, ge=1, le=24)
+    max_rental_hours: int = Field(default=8, ge=1, le=24)
+    instant_book: bool = True
+    bareboat_allowed: bool = True
+    activity_tags: list[str] = Field(default_factory=list)
 
 
 class AdminActivityOut(AdminActivityIn):
     id: int
+    listing_status: str
     ticket_types: list[AdminTicketTypeOut] = []
 
     model_config = {"from_attributes": True}
@@ -52,8 +119,14 @@ class AdminActivityListItem(BaseModel):
     title: str
     slug: str
     location_label: str | None
+    city: str | None = None
     duration_minutes: int
     is_active: bool
+    listing_status: str
+    boat_type: str | None = None
+    max_guests: int | None = None
+    hourly_rate_cents: int | None = None
+    organization_name: str | None = None
     ticket_type_count: int = 0
     slot_count: int = 0
 
@@ -106,6 +179,45 @@ class AdminPromoOut(AdminPromoIn):
     model_config = {"from_attributes": True}
 
 
+class AdminOrganizationListItem(BaseModel):
+    id: int
+    name: str
+
+    model_config = {"from_attributes": True}
+
+
+class AdminCaptainIn(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    slug: str | None = Field(default=None, max_length=80)
+    bio: str | None = None
+    location: str | None = Field(default=None, max_length=120)
+    photo_url: str | None = Field(default=None, max_length=500)
+    coast_guard_verified: bool = False
+    phone_verified: bool = False
+    is_active: bool = True
+    organization_id: int | None = None
+
+
+class AdminCaptainOut(BaseModel):
+    id: int
+    organization_id: int
+    organization_name: str | None = None
+    slug: str
+    name: str
+    bio: str | None = None
+    location: str | None = None
+    photo_url: str | None = None
+    rating: float | None = None
+    review_count: int = 0
+    trips_completed: int = 0
+    coast_guard_verified: bool = False
+    phone_verified: bool = False
+    aboard_since_year: int | None = None
+    is_active: bool = True
+
+    model_config = {"from_attributes": True}
+
+
 class AdminBookingItemOut(BaseModel):
     ticket_name: str
     quantity: int
@@ -127,9 +239,39 @@ class AdminBookingOut(BaseModel):
     slot_id: int
     activity_title: str
     slot_starts_at: datetime
+    refund_cents: int = 0
+    cancelled_at: datetime | None = None
+    cancelled_by: str | None = None
     items: list[AdminBookingItemOut] = []
 
     model_config = {"from_attributes": True}
+
+
+class AdminBookingDetailOut(AdminBookingOut):
+    booking_kind: str = "departure"
+    activity_slug: str | None = None
+    organization_name: str | None = None
+    rental_starts_at: datetime | None = None
+    duration_hours: int | None = None
+    passenger_count: int | None = None
+    captain_included: bool = False
+    captain_name: str | None = None
+    boat_price_cents: int = 0
+    captain_price_cents: int = 0
+    insurance_cents: int = 0
+    addon_cents: int = 0
+    subtotal_cents: int = 0
+    discount_cents: int = 0
+    tax_cents: int = 0
+    platform_fee_cents: int = 0
+    owner_payout_cents: int = 0
+    promo_code: str | None = None
+    cancellation_reason: str | None = None
+    stripe_refund_id: str | None = None
+    comments: str | None = None
+    heard_about: str | None = None
+    been_before: str | None = None
+    marketing_opt_in: bool = False
 
 
 class AdminStatusCount(BaseModel):
@@ -247,3 +389,100 @@ class AdminBulkSlotsIn(BaseModel):
     brand_label: str | None = None
     urgency_text: str | None = None
     booking_cutoff_hours: int | None = Field(default=None, ge=0, le=168)
+
+
+class MarketplacePromiseItemIn(BaseModel):
+    title: str = Field(min_length=1, max_length=200)
+    body: str = Field(default="", max_length=1000)
+
+
+class PlatformSettingsOut(BaseModel):
+    platform_fee_percent: float
+    tax_rate_percent: float
+    cancel_full_refund_hours: float
+    cancel_partial_refund_hours: float
+    cancel_partial_refund_percent: float
+    trip_protection_summary: str | None = None
+    marketplace_promise_title: str | None = None
+    marketplace_promise_items: list[MarketplacePromiseItemIn] | None = None
+    destination_best_title_template: str | None = None
+    destination_type_title_template: str | None = None
+
+
+class PlatformSettingsIn(BaseModel):
+    platform_fee_percent: float = Field(ge=0, le=50)
+    tax_rate_percent: float = Field(ge=0, le=30)
+    cancel_full_refund_hours: float = Field(ge=1, le=336)
+    cancel_partial_refund_hours: float = Field(ge=0, le=336)
+    cancel_partial_refund_percent: float = Field(ge=0, le=100)
+    trip_protection_summary: str | None = Field(default=None, max_length=2000)
+    marketplace_promise_title: str | None = Field(default=None, max_length=300)
+    marketplace_promise_items: list[MarketplacePromiseItemIn] | None = None
+    destination_best_title_template: str | None = Field(default=None, max_length=200)
+    destination_type_title_template: str | None = Field(default=None, max_length=200)
+
+
+class AdminReviewOut(BaseModel):
+    id: int
+    rating: int
+    body: str | None
+    reviewer_name: str
+    created_at: datetime
+    owner_response: str | None = None
+    owner_response_at: datetime | None = None
+    activity_id: int
+    activity_title: str
+    booking_reference: str
+
+
+class AdminReviewRespondIn(BaseModel):
+    response: str = Field(min_length=1, max_length=2000)
+
+
+class AdminCancelBookingIn(BaseModel):
+    reason: str | None = Field(default=None, max_length=200)
+    full_refund: bool = False
+
+
+class CancelBookingOut(BaseModel):
+    ok: bool = True
+    reference: str
+    status: str
+    refund_cents: int
+    message: str | None = None
+
+
+class ConnectStatusOut(BaseModel):
+    stripe_configured: bool
+    account_id: str | None = None
+    charges_enabled: bool = False
+    payouts_enabled: bool = False
+    details_submitted: bool = False
+    ready_for_payments: bool = False
+    dashboard_url: str | None = None
+
+
+class ConnectOnboardOut(BaseModel):
+    url: str
+
+
+class EarningsBookingOut(BaseModel):
+    id: int
+    reference: str
+    customer_name: str
+    total_cents: int
+    platform_fee_cents: int
+    owner_payout_cents: int
+    tax_cents: int
+    created_at: datetime
+    activity_title: str
+
+
+class EarningsOut(BaseModel):
+    gross_revenue_cents: int
+    platform_fees_cents: int
+    net_earnings_cents: int
+    tax_collected_cents: int
+    paid_booking_count: int
+    connect: ConnectStatusOut | None = None
+    recent_bookings: list[EarningsBookingOut] = []

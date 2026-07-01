@@ -1,0 +1,13 @@
+# Expose both the React app and the FastAPI backend for remote testers.
+# Usage: ./scripts/ngrok-tunnel.sh
+# Requires: ngrok authtoken in your global config (`ngrok config add-authtoken …`).
+# The tunnel script merges this file with ~/Library/Application Support/ngrok/ngrok.yml.
+
+version: "2"
+tunnels:
+  web:
+    addr: 5173
+    proto: http
+  api:
+    addr: 8000
+    proto: http

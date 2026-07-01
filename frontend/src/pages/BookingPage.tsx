@@ -15,6 +15,7 @@ import CheckoutForm from "../components/CheckoutForm";
 import HoldCountdown from "../components/HoldCountdown";
 import OrderSummary from "../components/OrderSummary";
 import { showToast } from "../toast";
+import { getRenterProfile } from "../renter/renterApi";
 import { formatDateTime, formatMoney, formatSlotRange } from "../utils";
 
 type QtyMap = Record<number, number>;
@@ -78,6 +79,17 @@ export default function BookingPage() {
   }, [releaseActiveHold]);
 
   useEffect(() => {
+    const profile = getRenterProfile();
+    if (profile.name || profile.email) {
+      setForm((f) => ({
+        ...f,
+        name: f.name || profile.name || "",
+        email: f.email || profile.email || "",
+      }));
+    }
+  }, []);
+
+  useEffect(() => {
     const id = Number(slotId);
     if (!id) return;
     resetCheckout();
@@ -139,7 +151,7 @@ export default function BookingPage() {
   }
 
   async function applyPromo() {
-    const res = await validatePromo(promo, subtotal);
+    const res = await validatePromo(promo, subtotal, slot?.id);
     if (res.valid) {
       setPromoDiscount(res.discount_cents);
       setPromoMsg(res.message);
@@ -506,6 +518,9 @@ export default function BookingPage() {
           holdExpiresAt={showPayment ? holdExpiresAt : null}
           holdSecondsRemaining={showPayment ? holdSecondsRemaining : undefined}
         />
+        {config?.trip_protection_summary && (
+          <p className="booking-trust-note">🛡️ {config.trip_protection_summary}</p>
+        )}
       </aside>
     </div>
   );

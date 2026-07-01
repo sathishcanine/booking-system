@@ -10,6 +10,11 @@ export default function SiteHeader() {
           <small>ESF</small>
         </span>
       </Link>
+      <nav className="site-nav">
+        <Link to="/boats">Browse boats</Link>
+        <Link to="/">Calendar</Link>
+        <Link to="/owner/register">List your boat</Link>
+      </nav>
     </header>
   );
 }

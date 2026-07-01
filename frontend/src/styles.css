@@ -40,8 +40,29 @@ a {
 .site-header {
   background: var(--card);
   border-bottom: 1px solid var(--border);
-  padding: 1rem;
-  text-align: center;
+  padding: 1rem 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.site-nav {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  font-size: 0.95rem;
+}
+
+.site-nav a {
+  color: var(--text);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.site-nav a:hover {
+  color: var(--accent);
 }
 
 .logo {
@@ -481,6 +502,17 @@ a {
 .booking-sidebar {
   position: sticky;
   top: 1rem;
+}
+
+.booking-trust-note {
+  margin-top: 1rem;
+  padding: 0.75rem 0.85rem;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  color: #475569;
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  border-radius: 8px;
 }
 
 .order-summary h3 {

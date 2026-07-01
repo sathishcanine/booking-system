@@ -83,7 +83,11 @@ def validate_lines(
     return resolved, total_qty
 
 
-def create_booking(db: Session, payload: CreateBookingIn) -> Booking:
+def create_booking(
+    db: Session,
+    payload: CreateBookingIn,
+    renter_user_id: int | None = None,
+) -> Booking:
     slot = (
         db.query(Slot)
         .options(joinedload(Slot.activity).joinedload(Activity.ticket_types))
@@ -116,11 +120,15 @@ def create_booking(db: Session, payload: CreateBookingIn) -> Booking:
     subtotal = sum(tt.price_cents * qty for tt, qty in resolved)
     promo = None
     if payload.promo_code:
+        from sqlalchemy import or_
+
+        org_id = slot.activity.organization_id
         promo = (
             db.query(PromoCode)
             .filter(
                 PromoCode.code == payload.promo_code.upper().strip(),
                 PromoCode.is_active.is_(True),
+                or_(PromoCode.organization_id.is_(None), PromoCode.organization_id == org_id),
             )
             .first()
         )
@@ -131,9 +139,14 @@ def create_booking(db: Session, payload: CreateBookingIn) -> Booking:
         if is_promo_exhausted(promo):
             raise ValueError("Promo code no longer available")
 
+    from app.services.fees import calc_booking_split
+    from app.services.platform_settings import get_platform_settings
+
+    ps = get_platform_settings(db)
     discount = apply_promo(promo, subtotal)
     after_discount = max(0, subtotal - discount)
-    tax = calc_tax(after_discount)
+    tax = calc_tax(after_discount, ps.tax_rate_percent)
+    platform_fee, owner_payout = calc_booking_split(subtotal, discount, ps.platform_fee_percent)
     total = after_discount + tax
 
     is_waitlist = left <= 0 and payload.join_waitlist
@@ -141,6 +154,8 @@ def create_booking(db: Session, payload: CreateBookingIn) -> Booking:
 
     booking = Booking(
         reference=_ref(),
+        organization_id=slot.activity.organization_id,
+        renter_user_id=renter_user_id,
         slot_id=slot.id,
         status=BookingStatus.PENDING,
         customer_name=payload.customer_name.strip(),
@@ -152,6 +167,8 @@ def create_booking(db: Session, payload: CreateBookingIn) -> Booking:
         discount_cents=discount,
         tax_cents=tax,
         total_cents=total if not is_waitlist else 0,
+        platform_fee_cents=0 if is_waitlist else platform_fee,
+        owner_payout_cents=0 if is_waitlist else owner_payout,
         hold_expires_at=hold_until,
         is_waitlist=is_waitlist,
         heard_about=payload.heard_about,

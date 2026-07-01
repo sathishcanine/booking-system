@@ -3,7 +3,7 @@ from datetime import date, datetime, timedelta
 
 from sqlalchemy.orm import Session, joinedload
 
-from app.models import Slot, SlotStatus
+from app.models import Activity, ListingStatus, Slot, SlotStatus
 from app.schemas import CalendarCellOut, CalendarMonthOut, CalendarSlotOut
 from app.services.availability import booking_deadline, effective_cutoff_hours, slot_status
 from app.services.booking import pending_holds_for_slot
@@ -69,7 +69,12 @@ def slot_to_out(db: Session, slot: Slot) -> CalendarSlotOut:
     )
 
 
-def build_month_calendar(db: Session, year: int, month: int) -> CalendarMonthOut:
+def build_month_calendar(
+    db: Session,
+    year: int,
+    month: int,
+    activity_id: int | None = None,
+) -> CalendarMonthOut:
     today = date.today()
     first, last = _month_bounds(year, month)
     grid_start = _grid_start(first)
@@ -83,14 +88,21 @@ def build_month_calendar(db: Session, year: int, month: int) -> CalendarMonthOut
         grid_end + timedelta(days=1), datetime.min.time(), tzinfo=UTC
     )
 
+    slot_filters = [
+        Slot.is_cancelled.is_(False),
+        Slot.starts_at >= range_start,
+        Slot.starts_at < range_end,
+        Activity.listing_status == ListingStatus.PUBLISHED,
+        Activity.is_active.is_(True),
+    ]
+    if activity_id is not None:
+        slot_filters.append(Slot.activity_id == activity_id)
+
     slots = (
         db.query(Slot)
+        .join(Activity, Slot.activity_id == Activity.id)
         .options(joinedload(Slot.activity))
-        .filter(
-            Slot.is_cancelled.is_(False),
-            Slot.starts_at >= range_start,
-            Slot.starts_at < range_end,
-        )
+        .filter(*slot_filters)
         .order_by(Slot.starts_at)
         .all()
     )

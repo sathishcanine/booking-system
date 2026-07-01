@@ -2,21 +2,17 @@ from __future__ import annotations
 
 import logging
 import secrets
-import time
 
-import jwt
 from fastapi import Depends, HTTPException
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.config import settings
+from app.platform_auth import (
+    PlatformUser,
+    issue_platform_token,
+    require_platform_user,
+)
 
 logger = logging.getLogger(__name__)
-
-_bearer = HTTPBearer(auto_error=False)
-
-ALGORITHM = "HS256"
-ADMIN_SUBJECT = "admin"
-TOKEN_TYPE = "access"
 
 _WEAK_PASSWORDS = frozenset({"changeme", ""})
 _WEAK_SECRETS = frozenset(
@@ -69,46 +65,17 @@ def validate_admin_auth_config() -> None:
 
 
 def issue_admin_token() -> tuple[str, int]:
-    if not settings.admin_jwt_secret:
-        raise HTTPException(503, "Admin JWT secret not configured on server")
-
-    now = int(time.time())
-    expires_in = settings.admin_jwt_expire_minutes * 60
-    payload = {
-        "sub": ADMIN_SUBJECT,
-        "type": TOKEN_TYPE,
-        "iat": now,
-        "exp": now + expires_in,
-    }
-    token = jwt.encode(payload, settings.admin_jwt_secret, algorithm=ALGORITHM)
-    return token, expires_in
+    """Legacy super-admin token (env password login)."""
+    user = PlatformUser(
+        user_id=None,
+        role="super_admin",
+        organization_id=None,
+        email=None,
+    )
+    return issue_platform_token(user)
 
 
-def decode_admin_token(token: str) -> dict:
-    if not settings.admin_jwt_secret:
-        raise HTTPException(503, "Admin API not configured")
-    try:
-        payload = jwt.decode(
-            token,
-            settings.admin_jwt_secret,
-            algorithms=[ALGORITHM],
-            options={"require": ["exp", "sub", "type"]},
-        )
-    except jwt.ExpiredSignatureError as e:
-        raise HTTPException(401, "Session expired — please sign in again") from e
-    except jwt.InvalidTokenError as e:
-        raise HTTPException(401, "Invalid admin token") from e
-
-    if payload.get("sub") != ADMIN_SUBJECT or payload.get("type") != TOKEN_TYPE:
-        raise HTTPException(401, "Invalid admin token")
-    return payload
-
-
-def require_admin(
-    creds: HTTPAuthorizationCredentials | None = Depends(_bearer),
-) -> None:
-    if not settings.admin_jwt_secret:
-        raise HTTPException(503, "Admin API not configured")
-    if creds is None or creds.scheme.lower() != "bearer":
-        raise HTTPException(401, "Missing admin token")
-    decode_admin_token(creds.credentials)
+def require_admin(user: PlatformUser = Depends(require_platform_user)) -> PlatformUser:
+    if user.role == "renter":
+        raise HTTPException(403, "Boat owner or admin access required")
+    return user
