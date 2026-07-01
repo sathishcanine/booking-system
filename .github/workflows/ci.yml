@@ -2,8 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main, master]
+    branches: [main, master, uat]
   pull_request:
+    branches: [main, master, uat]
 
 jobs:
   backend:
@@ -47,3 +48,29 @@ jobs:
         run: npx tsc --noEmit
       - name: Build
         run: npm run build
+
+  docker-verify-api:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build API image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          push: false
+
+  docker-verify-web:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Web image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          push: false
+          build-args: |
+            VITE_API_URL=
+            VITE_GOOGLE_CLIENT_ID=
+            VITE_GOOGLE_MAPS_API_KEY=

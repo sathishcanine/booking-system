@@ -915,6 +915,169 @@ def seed_month_slots(
     return created
 
 
+def _ensure_demo_tours(db, org) -> list[Activity]:
+    """Create classic tour/cruise demo listings if not already present."""
+    if db.query(Activity).filter(Activity.slug == "dolphin-island-sunset").first():
+        return db.query(Activity).filter(Activity.slug.in_(DEMO_TOUR_SLUGS)).all()
+
+    activities = [
+        Activity(
+            organization_id=org.id,
+            listing_status=ListingStatus.PUBLISHED,
+            max_guests=24,
+            boat_type="pontoon",
+            city="Gulfport",
+            state="FL",
+            marina_name="Gulfport Marina",
+            title="Dolphin Watching & Island Sunset",
+            slug="dolphin-island-sunset",
+            description="2.5hr Dolphin Watching & Island Sunset 🐬🌴🌅",
+            duration_minutes=150,
+            location_label="Gulfport Marina Location",
+            image_url="https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=400",
+            emoji="🐬🌴🌅",
+            meeting_instructions="Meet at Gulfport Marina, 4635 29th Ave S, Gulfport, FL 33711.",
+        ),
+        Activity(
+            organization_id=org.id,
+            title="Sandbar Party",
+            slug="sandbar-party",
+            description="Boat #1: 4hr Sandbar Party with All You Can Drink! 🍹",
+            duration_minutes=240,
+            location_label="SkyBeach Resort Location",
+            image_url="https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=400",
+            emoji="🍹🌴",
+            meeting_instructions="SkyBeach Resort dock — check in 20 minutes early.",
+        ),
+        Activity(
+            organization_id=org.id,
+            title="Water Sports Charter",
+            slug="water-sports-charter",
+            description="Private charter — wakeboard, tubes, and more. 🚤",
+            duration_minutes=180,
+            location_label="Gulfport Marina Location",
+            emoji="🚤",
+        ),
+        Activity(
+            organization_id=org.id,
+            title="Egmont Key Island Adventure",
+            slug="egmont-key",
+            description="Explore Egmont Key with snorkeling and wildlife. 🏝️",
+            duration_minutes=300,
+            location_label="Gulfport Marina Location",
+            image_url="https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=400",
+            emoji="🏝️🐬",
+        ),
+        Activity(
+            organization_id=org.id,
+            title="Shell Key Dolphin Float Party",
+            slug="float-party",
+            description="The ultimate family beach day by boat! 🐬☀️",
+            duration_minutes=240,
+            location_label="SkyBeach Resort Location",
+            image_url="https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400",
+            emoji="🐬☀️",
+        ),
+        Activity(
+            organization_id=org.id,
+            title="Booze Cruise",
+            slug="booze-cruise",
+            description="2.5hr Booze Cruise with All You Can Drink! 🍹🌅",
+            duration_minutes=150,
+            location_label="SkyBeach Resort Location",
+            emoji="🍹🌅",
+        ),
+    ]
+    db.add_all(activities)
+    db.flush()
+
+    sunset, sandbar, charter, egmont, float_party, booze = activities
+
+    db.add_all(
+        [
+            TicketType(
+                activity_id=sunset.id,
+                name="Island Sunset Cruise - Adults",
+                subtitle="Shell Island Sunset Cruise",
+                price_cents=5000,
+                sort_order=1,
+            ),
+            TicketType(
+                activity_id=sunset.id,
+                name="Island Sunset Cruise - Children",
+                subtitle="12 & Under",
+                price_cents=2500,
+                sort_order=2,
+            ),
+            TicketType(
+                activity_id=sandbar.id,
+                name="Adults",
+                subtitle="21+",
+                price_cents=8900,
+                sort_order=1,
+            ),
+            TicketType(
+                activity_id=charter.id,
+                name="Charter (up to 6 guests)",
+                subtitle="Price per boat",
+                price_cents=59900,
+                sort_order=1,
+                max_per_booking=1,
+            ),
+            TicketType(
+                activity_id=egmont.id,
+                name="Adults",
+                subtitle="Full day adventure",
+                price_cents=7500,
+                sort_order=1,
+            ),
+            TicketType(
+                activity_id=float_party.id,
+                name="Adults",
+                subtitle="Float & dolphin experience",
+                price_cents=6500,
+                sort_order=1,
+            ),
+            TicketType(
+                activity_id=booze.id,
+                name="Adults",
+                subtitle="21+",
+                price_cents=5500,
+                sort_order=1,
+            ),
+        ]
+    )
+    if not db.query(PromoCode).filter(PromoCode.code == "SAVE10").first():
+        db.add(
+            PromoCode(
+                organization_id=org.id,
+                code="SAVE10",
+                discount_cents=1000,
+                max_uses=100,
+            )
+        )
+
+    today = utcnow().date()
+    total = 0
+    for year, month in _demo_month_pairs(today):
+        total += seed_month_slots(db, activities, year, month, today)
+    if total:
+        print(f"Added {total} demo tour slots for new listings.")
+    return activities
+
+
+DEMO_TOUR_SLUGS = frozenset(
+    {
+        "dolphin-island-sunset",
+        "sandbar-party",
+        "water-sports-charter",
+        "egmont-key",
+        "float-party",
+        "booze-cruise",
+    }
+)
+
+
 def ensure_demo_months(months: list[tuple[int, int]] | None = None) -> int:
     today = utcnow().date()
     months = months or _demo_month_pairs(today)
@@ -1094,162 +1257,13 @@ def seed():
     _normalize_market_location(db)
     db.commit()
 
-    if db.query(Activity).first():
-        if settings.seed_demo_data:
-            _seed_demo_reviews(db)
-            db.commit()
-            ensure_demo_months()
-        db.close()
-        return
-
     if not settings.seed_demo_data:
         db.close()
         print("Skipping demo listings (SEED_DEMO_DATA=false / APP_ENV=production).")
         return
 
-    activities = [
-        Activity(
-            organization_id=org.id,
-            listing_status=ListingStatus.PUBLISHED,
-            max_guests=24,
-            boat_type="pontoon",
-            city="Gulfport",
-            state="FL",
-            marina_name="Gulfport Marina",
-            title="Dolphin Watching & Island Sunset",
-            slug="dolphin-island-sunset",
-            description="2.5hr Dolphin Watching & Island Sunset 🐬🌴🌅",
-            duration_minutes=150,
-            location_label="Gulfport Marina Location",
-            image_url="https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=400",
-            emoji="🐬🌴🌅",
-            meeting_instructions="Meet at Gulfport Marina, 4635 29th Ave S, Gulfport, FL 33711.",
-        ),
-        Activity(
-            organization_id=org.id,
-            title="Sandbar Party",
-            slug="sandbar-party",
-            description="Boat #1: 4hr Sandbar Party with All You Can Drink! 🍹",
-            duration_minutes=240,
-            location_label="SkyBeach Resort Location",
-            image_url="https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=400",
-            emoji="🍹🌴",
-            meeting_instructions="SkyBeach Resort dock — check in 20 minutes early.",
-        ),
-        Activity(
-            organization_id=org.id,
-            title="Water Sports Charter",
-            slug="water-sports-charter",
-            description="Private charter — wakeboard, tubes, and more. 🚤",
-            duration_minutes=180,
-            location_label="Gulfport Marina Location",
-            emoji="🚤",
-        ),
-        Activity(
-            organization_id=org.id,
-            title="Egmont Key Island Adventure",
-            slug="egmont-key",
-            description="Explore Egmont Key with snorkeling and wildlife. 🏝️",
-            duration_minutes=300,
-            location_label="Gulfport Marina Location",
-            image_url="https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=400",
-            emoji="🏝️🐬",
-        ),
-        Activity(
-            organization_id=org.id,
-            title="Shell Key Dolphin Float Party",
-            slug="float-party",
-            description="The ultimate family beach day by boat! 🐬☀️",
-            duration_minutes=240,
-            location_label="SkyBeach Resort Location",
-            image_url="https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400",
-            emoji="🐬☀️",
-        ),
-        Activity(
-            organization_id=org.id,
-            title="Booze Cruise",
-            slug="booze-cruise",
-            description="2.5hr Booze Cruise with All You Can Drink! 🍹🌅",
-            duration_minutes=150,
-            location_label="SkyBeach Resort Location",
-            emoji="🍹🌅",
-        ),
-    ]
-    db.add_all(activities)
-    db.flush()
-
-    sunset, sandbar, charter, egmont, float_party, booze = activities
-
-    db.add_all(
-        [
-            TicketType(
-                activity_id=sunset.id,
-                name="Island Sunset Cruise - Adults",
-                subtitle="Shell Island Sunset Cruise",
-                price_cents=5000,
-                sort_order=1,
-            ),
-            TicketType(
-                activity_id=sunset.id,
-                name="Island Sunset Cruise - Children",
-                subtitle="12 & Under",
-                price_cents=2500,
-                sort_order=2,
-            ),
-            TicketType(
-                activity_id=sandbar.id,
-                name="Adults",
-                subtitle="21+",
-                price_cents=8900,
-                sort_order=1,
-            ),
-            TicketType(
-                activity_id=charter.id,
-                name="Charter (up to 6 guests)",
-                subtitle="Price per boat",
-                price_cents=59900,
-                sort_order=1,
-                max_per_booking=1,
-            ),
-            TicketType(
-                activity_id=egmont.id,
-                name="Adults",
-                subtitle="Full day adventure",
-                price_cents=7500,
-                sort_order=1,
-            ),
-            TicketType(
-                activity_id=float_party.id,
-                name="Adults",
-                subtitle="Float & dolphin experience",
-                price_cents=6500,
-                sort_order=1,
-            ),
-            TicketType(
-                activity_id=booze.id,
-                name="Adults",
-                subtitle="21+",
-                price_cents=5500,
-                sort_order=1,
-            ),
-        ]
-    )
-    db.add(
-        PromoCode(
-            organization_id=org.id,
-            code="SAVE10",
-            discount_cents=1000,
-            max_uses=100,
-        )
-    )
-
-    today = utcnow().date()
-    total = 0
-    for year, month in _demo_month_pairs(today):
-        total += seed_month_slots(db, activities, year, month, today)
-
+    _ensure_demo_tours(db, org)
     _seed_demo_reviews(db)
-    _normalize_market_location(db)
     db.commit()
+    ensure_demo_months()
     db.close()
-    print(f"Database seeded with {total} demo slots across current and next month.")
