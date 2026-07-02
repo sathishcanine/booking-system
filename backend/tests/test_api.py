@@ -30,3 +30,23 @@ def test_config_endpoint():
     assert response.status_code == 200
     data = response.json()
     assert "site_timezone" in data
+
+
+def test_contact_inquiry_submission():
+    from app.main import app
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/contact",
+            json={
+                "first_name": "Jane",
+                "last_name": "Doe",
+                "email": "jane@example.com",
+                "phone": "+1 555 0100",
+                "message": "Interested in a sunset cruise.",
+            },
+        )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["ok"] is True
+    assert isinstance(data["id"], int)

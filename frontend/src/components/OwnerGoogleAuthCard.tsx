@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ownerGoogleLogin } from "../admin/adminApi";
 import { useAdminAuth } from "../admin/AdminAuth";
+import AlisAdventureLogo from "./AlisAdventureLogo";
 import GoogleSignInButton from "./GoogleSignInButton";
 
 const OWNER_HERO_IMAGE =
@@ -55,7 +56,8 @@ export default function OwnerGoogleAuthCard({ mode }: Props) {
         />
         <div className="owner-auth-hero-overlay" aria-hidden />
         <div className="owner-auth-hero-content">
-          <h1 className="owner-auth-brand">Alis, for Boat Owners</h1>
+          <AlisAdventureLogo size="hero" tone="onDark" linkTo="/" className="owner-auth-logo" />
+          <p className="owner-auth-tagline">for Boat Owners</p>
           <p className="owner-auth-lead">
             {isRegister
               ? "Share your boat with the world. Join owners earning from day charters, sunset cruises, and weekend rentals."
@@ -79,6 +81,7 @@ export default function OwnerGoogleAuthCard({ mode }: Props) {
 
       <div className="owner-auth-panel">
         <div className="owner-auth-card">
+          <AlisAdventureLogo size="auth" linkTo="/boats" className="owner-auth-card-logo" />
           <Link to="/boats" className="owner-auth-back">
             ← Back to marketplace
           </Link>

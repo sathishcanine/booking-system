@@ -1,30 +1,10 @@
 import { Link, useLocation } from "react-router-dom";
 import { useRenterAuth } from "../renter/RenterAuth";
+import AlisAdventureLogo from "./AlisAdventureLogo";
 
 type Props = {
   variant?: "default" | "hero";
 };
-
-function SailLogo({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      width="32"
-      height="32"
-      viewBox="0 0 32 32"
-      fill="none"
-      aria-hidden
-    >
-      <path
-        d="M6 26L16 6L26 26H6Z"
-        fill="currentColor"
-        opacity="0.35"
-      />
-      <path d="M10 26L16 10L22 26H10Z" fill="currentColor" />
-      <path d="M16 6V26" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-    </svg>
-  );
-}
 
 export default function MarketplaceNav({ variant = "default" }: Props) {
   const { pathname } = useLocation();
@@ -34,15 +14,12 @@ export default function MarketplaceNav({ variant = "default" }: Props) {
   if (onHero) {
     return (
       <header className="alis-nav alis-nav--hero alis-nav--home">
-        <Link to="/" className="alis-nav-brand alis-nav-brand--full">
-          <SailLogo className="alis-nav-logo" />
-          <span>AlisAdventure</span>
-        </Link>
+        <AlisAdventureLogo size="hero" tone="onDark" className="alis-nav-brand-logo" />
         <nav className="alis-nav-links alis-nav-links--hero">
           <Link to="/boats?category=celebrating" className="alis-nav-link alis-nav-link--upper">
             Special events
           </Link>
-          <Link to="/boats?captain=captained" className="alis-nav-link alis-nav-link--upper">
+          <Link to="/captains" className="alis-nav-link alis-nav-link--upper">
             Captain program
           </Link>
           <Link to="/owner/register" className="alis-nav-link alis-nav-link--upper">
@@ -58,10 +35,7 @@ export default function MarketplaceNav({ variant = "default" }: Props) {
 
   return (
     <header className="alis-nav">
-      <Link to="/" className="alis-nav-brand">
-        <SailLogo className="alis-nav-logo alis-nav-logo--dark" />
-        <span>AlisAdventure</span>
-      </Link>
+      <AlisAdventureLogo size="nav" className="alis-nav-brand-logo" />
       <nav className="alis-nav-links">
         <Link
           to="/boats"
@@ -70,6 +44,16 @@ export default function MarketplaceNav({ variant = "default" }: Props) {
           }
         >
           Experiences
+        </Link>
+        <Link
+          to="/captains"
+          className={
+            pathname.startsWith("/captains")
+              ? "alis-nav-link alis-nav-link--active"
+              : "alis-nav-link"
+          }
+        >
+          Captain program
         </Link>
         <Link to="/owner/register" className="alis-nav-link">
           List your boat

@@ -276,6 +276,9 @@ class BoatCaptainProfileOut(BaseModel):
     review_count: int = 0
     trips_completed: int = 0
     coast_guard_verified: bool = True
+    experience: str | None = None
+    license_types: list[str] = []
+    specializations: list[str] = []
 
 
 class BoatListingPoliciesOut(BaseModel):
@@ -333,7 +336,26 @@ class CaptainProfilePageOut(BaseModel):
     aboard_since_year: int | None = None
     location: str | None = None
     trips_completed: int = 0
+    experience: str | None = None
+    license_types: list[str] = []
+    specializations: list[str] = []
     boats: list[ProfileBoatOut] = []
+    reviews: list[ProfileReviewOut] = []
+
+
+class CaptainListItemOut(BaseModel):
+    id: str
+    slug: str
+    name: str
+    photo_url: str | None = None
+    rating: float | None = None
+    review_count: int = 0
+    coast_guard_verified: bool = True
+    bio: str | None = None
+    location: str | None = None
+    experience: str | None = None
+    license_types: list[str] = []
+    specializations: list[str] = []
 
 
 class BoatDetailOut(BoatCardOut):
@@ -350,6 +372,19 @@ class BoatsPageOut(BaseModel):
     total: int
     limit: int
     offset: int
+
+
+class ContactInquiryIn(BaseModel):
+    first_name: str = Field(min_length=1, max_length=80)
+    last_name: str = Field(min_length=1, max_length=80)
+    email: str = Field(min_length=3, max_length=200)
+    phone: str = Field(min_length=3, max_length=40)
+    message: str | None = Field(default=None, max_length=5000)
+
+
+class ContactInquiryOut(BaseModel):
+    id: int
+    ok: bool = True
 
 
 class DestinationOut(BaseModel):

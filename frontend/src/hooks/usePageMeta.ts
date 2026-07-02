@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 
-const SITE = "Alis";
+const SITE = "AlisAdventure";
 const DEFAULT_DESCRIPTION =
   "Boat rentals, captain-led trips, and on-the-water experiences — browse, book, boat.";
 

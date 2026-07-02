@@ -3,11 +3,11 @@ from sqlalchemy.orm import Session
 from app.listings import json_list_from_db, primary_photo
 from app.marketplace_config import captain_by_id
 from app.models import Activity, ListingStatus, Organization, Review
-from app.services.captains import compute_captain_stats, resolve_org_captain
 from app.schemas import CaptainProfilePageOut, OwnerProfilePageOut, ProfileBoatOut, ProfileReviewOut
 from app.services.boat_catalog import published_activities_query
 from app.services.boat_detail import _owner_user
 from app.services.boat_rental import hourly_rate_cents
+from app.services.captains import compute_captain_stats, resolve_org_captain
 from app.services.reviews import rating_aggregates
 
 
@@ -147,6 +147,9 @@ def build_captain_profile_page(
             aboard_since_year=stats["aboard_since_year"],
             location=row.location,
             trips_completed=stats["trips_completed"],
+            experience=row.experience,
+            license_types=json_list_from_db(row.license_types),
+            specializations=json_list_from_db(row.specializations),
             boats=_profile_boats(db, captained),
         )
 

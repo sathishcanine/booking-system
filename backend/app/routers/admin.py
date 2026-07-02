@@ -20,6 +20,7 @@ from app.admin_schemas import (
     AdminBulkSlotsIn,
     AdminCaptainIn,
     AdminCaptainOut,
+    AdminContactInquiryOut,
     AdminDashboardOut,
     AdminOrganizationListItem,
     ConnectStatusOut,
@@ -41,7 +42,13 @@ from app.admin_schemas import (
     AdminTicketTypeOut,
     AdminUploadOut,
 )
+from app.captain_profile_config import (
+    VALID_EXPERIENCE_IDS,
+    VALID_LICENSE_IDS,
+    VALID_SPECIALIZATION_IDS,
+)
 from app.database import get_db
+from app.listings import json_list_from_db, json_list_to_db
 from app.marketplace_config import MARKET_CITY, MARKET_LABEL, MARKET_STATE
 from app.models import (
     Activity,
@@ -49,6 +56,7 @@ from app.models import (
     BookingItem,
     BookingStatus,
     Captain,
+    ContactInquiry,
     ListingStatus,
     Organization,
     PromoCode,
@@ -783,6 +791,9 @@ def _captain_out(db: Session, captain: Captain) -> AdminCaptainOut:
         bio=captain.bio,
         location=captain.location,
         photo_url=captain.photo_url,
+        experience=captain.experience,
+        license_types=json_list_from_db(captain.license_types),
+        specializations=json_list_from_db(captain.specializations),
         rating=stats["rating"],
         review_count=stats["review_count"],
         trips_completed=stats["trips_completed"],
@@ -791,6 +802,17 @@ def _captain_out(db: Session, captain: Captain) -> AdminCaptainOut:
         aboard_since_year=stats["aboard_since_year"],
         is_active=captain.is_active,
     )
+
+
+def _validate_captain_profile(body: AdminCaptainIn) -> None:
+    if body.experience and body.experience not in VALID_EXPERIENCE_IDS:
+        raise HTTPException(400, "Invalid experience option")
+    invalid_licenses = [item for item in body.license_types if item not in VALID_LICENSE_IDS]
+    if invalid_licenses:
+        raise HTTPException(400, "Invalid license type")
+    invalid_specs = [item for item in body.specializations if item not in VALID_SPECIALIZATION_IDS]
+    if invalid_specs:
+        raise HTTPException(400, "Invalid specialization")
 
 
 def _resolve_captain_org_id(
@@ -812,6 +834,9 @@ def _apply_captain_fields(captain: Captain, body: AdminCaptainIn) -> None:
     captain.bio = body.bio
     captain.location = MARKET_LABEL
     captain.photo_url = body.photo_url
+    captain.experience = body.experience
+    captain.license_types = json_list_to_db(body.license_types)
+    captain.specializations = json_list_to_db(body.specializations)
     captain.coast_guard_verified = body.coast_guard_verified
     captain.phone_verified = body.phone_verified
     captain.is_active = body.is_active
@@ -847,6 +872,7 @@ def create_captain(
     user: PlatformUser = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
+    _validate_captain_profile(body)
     org_id = _resolve_captain_org_id(db, user, body)
     base_slug = body.slug or slugify_captain(body.name)
     from app.timeutil import utcnow
@@ -876,6 +902,7 @@ def update_captain(
     user: PlatformUser = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
+    _validate_captain_profile(body)
     captain = get_captain(db, user, captain_id)
     if body.slug:
         captain.slug = unique_captain_slug(
@@ -1247,6 +1274,59 @@ def respond_to_review(
         activity_id=review.activity_id,
         activity_title=review.activity.title if review.activity else "",
         booking_reference=review.booking.reference if review.booking else "",
+    )
+
+
+# --- Contact inquiries (super admin) ---
+
+
+@router.get("/contact-inquiries", response_model=list[AdminContactInquiryOut])
+def list_contact_inquiries(
+    user: PlatformUser = Depends(require_super_admin),
+    db: Session = Depends(get_db),
+):
+    rows = (
+        db.query(ContactInquiry)
+        .order_by(ContactInquiry.created_at.desc())
+        .limit(200)
+        .all()
+    )
+    return [
+        AdminContactInquiryOut(
+            id=row.id,
+            first_name=row.first_name,
+            last_name=row.last_name,
+            email=row.email,
+            phone=row.phone,
+            message=row.message,
+            is_read=row.is_read,
+            created_at=row.created_at,
+        )
+        for row in rows
+    ]
+
+
+@router.patch("/contact-inquiries/{inquiry_id}/read", response_model=AdminContactInquiryOut)
+def mark_contact_inquiry_read(
+    inquiry_id: int,
+    user: PlatformUser = Depends(require_super_admin),
+    db: Session = Depends(get_db),
+):
+    row = db.query(ContactInquiry).filter(ContactInquiry.id == inquiry_id).first()
+    if not row:
+        raise HTTPException(404, "Inquiry not found")
+    row.is_read = True
+    db.commit()
+    db.refresh(row)
+    return AdminContactInquiryOut(
+        id=row.id,
+        first_name=row.first_name,
+        last_name=row.last_name,
+        email=row.email,
+        phone=row.phone,
+        message=row.message,
+        is_read=row.is_read,
+        created_at=row.created_at,
     )
 
 

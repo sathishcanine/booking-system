@@ -53,7 +53,9 @@ from app.services.promo import is_promo_exhausted
 from app.routers import admin as admin_router
 from app.routers import auth as auth_router
 from app.routers import boats as boats_router
+from app.routers import captains as captains_router
 from app.routers import connect as connect_router
+from app.routers import contact as contact_router
 from app.routers import marketplace as marketplace_router
 from app.routers import rentals as rentals_router
 from app.routers import renter as renter_router
@@ -152,6 +154,8 @@ app.mount(
 app.include_router(admin_router.router)
 app.include_router(auth_router.router)
 app.include_router(boats_router.router)
+app.include_router(captains_router.router)
+app.include_router(contact_router.router)
 app.include_router(marketplace_router.router)
 app.include_router(connect_router.router)
 app.include_router(renter_router.router)

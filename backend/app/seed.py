@@ -164,6 +164,24 @@ def _ensure_captain_photo_column():
             conn.execute(text("ALTER TABLE captains ADD COLUMN photo_url VARCHAR(500)"))
 
 
+def _ensure_captain_profile_columns():
+    insp = inspect(engine)
+    if "captains" not in insp.get_table_names():
+        return
+    existing = {c["name"] for c in insp.get_columns("captains")}
+    alters = [
+        ("experience", "VARCHAR(40)"),
+        ("license_types", "TEXT"),
+        ("specializations", "TEXT"),
+    ]
+    pending = [(name, typedef) for name, typedef in alters if name not in existing]
+    if not pending:
+        return
+    with engine.begin() as conn:
+        for name, typedef in pending:
+            conn.execute(text(f"ALTER TABLE captains ADD COLUMN {name} {typedef}"))
+
+
 def _seed_org_captains(db, org: Organization) -> None:
     if db.query(Captain).filter(Captain.organization_id == org.id).first():
         return
@@ -1241,6 +1259,7 @@ def seed():
     _ensure_optional_review_booking()
     _ensure_captain_booking_column()
     _ensure_captain_photo_column()
+    _ensure_captain_profile_columns()
     db = SessionLocal()
     org = _ensure_default_platform_org(db)
     _ensure_super_admin_user(db, org)

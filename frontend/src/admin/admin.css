@@ -226,6 +226,15 @@
   padding: 1rem;
 }
 
+.admin-sidebar-brand .alis-brand-logo--admin {
+  display: block;
+}
+
+.admin-login-logo {
+  display: block;
+  margin: 0 auto 1.25rem;
+}
+
 .admin-login-card {
   background: #fff;
   border-radius: 10px;
@@ -836,6 +845,58 @@ a.admin-btn {
   font-size: 0.95rem;
 }
 
+.admin-captain-profile-section {
+  padding-top: 0.25rem;
+  border-top: 1px solid var(--border);
+}
+
+.admin-captain-profile-label {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #64748b;
+  margin-bottom: 0.65rem;
+}
+
+.admin-captain-option-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.admin-captain-option {
+  font-weight: 500;
+}
+
+.admin-captain-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.admin-captain-chip {
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  color: #0f172a;
+  border-radius: 999px;
+  padding: 0.45rem 0.85rem;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.admin-captain-chip--active {
+  border-color: #0f4c81;
+  background: #eff6ff;
+  color: #0f4c81;
+}
+
+.admin-captain-chip:focus-visible {
+  outline: 2px solid #0f4c81;
+  outline-offset: 2px;
+}
+
 .round-crop-field-label {
   display: block;
   font-size: 0.85rem;
@@ -970,4 +1031,63 @@ a.admin-btn {
   justify-content: flex-end;
   gap: 0.65rem;
   margin-top: 1rem;
+}
+
+.admin-contact-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+.admin-contact-detail-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.admin-contact-detail-head h2 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.admin-contact-meta {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0 0 1.25rem;
+}
+
+.admin-contact-meta dt {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.admin-contact-meta dd {
+  margin: 0.15rem 0 0;
+}
+
+.admin-contact-message h3 {
+  margin: 0 0 0.5rem;
+  font-size: 0.95rem;
+}
+
+.admin-contact-message p {
+  margin: 0;
+  white-space: pre-wrap;
+  line-height: 1.55;
+}
+
+.admin-contact-row--active {
+  background: #eff6ff;
+}
+
+@media (max-width: 960px) {
+  .admin-contact-layout {
+    grid-template-columns: 1fr;
+  }
 }

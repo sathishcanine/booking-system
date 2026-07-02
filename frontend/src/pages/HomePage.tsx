@@ -12,8 +12,6 @@ import { usePageMeta } from "../hooks/usePageMeta";
 export default function HomePage() {
   usePageMeta({
     title: "Explore St. Petersburg by Boat",
-    description:
-      "Discover unforgettable boat adventures, sandbars, beaches and hidden gems around St. Petersburg.",
   });
 
   const [featured, setFeatured] = useState<Boat[]>([]);
@@ -38,12 +36,11 @@ export default function HomePage() {
               Welcome to AlisAdventure
               <span className="alis-hero-eyebrow-line" aria-hidden />
             </p>
-            <h1>Explore St. Petersburg by Boat</h1>
+            <h1>
+              <span className="alis-hero-title-main">Explore St. Petersburg</span>
+              <span className="alis-hero-title-sub">by Boat</span>
+            </h1>
             <HeroSearchBar />
-            <p className="alis-hero-sub">
-              Discover unforgettable boat adventures, sandbars, beaches and hidden gems around St.
-              Petersburg.
-            </p>
           </div>
         </div>
       </section>

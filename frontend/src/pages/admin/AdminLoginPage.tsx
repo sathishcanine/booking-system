@@ -2,6 +2,7 @@ import { FormEvent, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { adminLogin } from "../../admin/adminApi";
 import { useAdminAuth } from "../../admin/AdminAuth";
+import AlisAdventureLogo from "../../components/AlisAdventureLogo";
 
 export default function AdminLoginPage() {
   const [password, setPassword] = useState("");
@@ -28,7 +29,8 @@ export default function AdminLoginPage() {
   return (
     <div className="admin-login-page">
       <div className="admin-login-card">
-        <h1>Alis platform admin</h1>
+        <AlisAdventureLogo size="auth" linkTo={false} className="admin-login-logo" />
+        <h1>Platform admin</h1>
         <p>
           Manage all owner boats, approve listings, platform fees, and marketplace-wide rental
           bookings.

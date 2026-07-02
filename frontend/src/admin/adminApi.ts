@@ -338,6 +338,9 @@ export type AdminCaptain = {
   bio: string | null;
   location: string | null;
   photo_url: string | null;
+  experience: string | null;
+  license_types: string[];
+  specializations: string[];
   rating: number | null;
   review_count: number;
   trips_completed: number;
@@ -353,6 +356,9 @@ export type AdminCaptainInput = {
   bio?: string | null;
   location?: string | null;
   photo_url?: string | null;
+  experience?: string | null;
+  license_types?: string[];
+  specializations?: string[];
   coast_guard_verified: boolean;
   phone_verified: boolean;
   is_active: boolean;
@@ -574,6 +580,17 @@ export type AdminReview = {
   booking_reference: string;
 };
 
+export type AdminContactInquiry = {
+  id: number;
+  first_name: string;
+  last_name: string;
+  email: string;
+  phone: string;
+  message: string | null;
+  is_read: boolean;
+  created_at: string;
+};
+
 export type ConnectStatus = {
   stripe_configured: boolean;
   account_id: string | null;
@@ -788,6 +805,13 @@ export const admin = {
       adminFetch<AdminReview>(`/api/admin/reviews/${id}/respond`, {
         method: "PATCH",
         body: JSON.stringify({ response }),
+      }),
+  },
+  contactInquiries: {
+    list: () => adminFetch<AdminContactInquiry[]>("/api/admin/contact-inquiries"),
+    markRead: (id: number) =>
+      adminFetch<AdminContactInquiry>(`/api/admin/contact-inquiries/${id}/read`, {
+        method: "PATCH",
       }),
   },
   bookings: {

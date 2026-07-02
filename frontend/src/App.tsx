@@ -1,4 +1,6 @@
 import { Route, Routes, useLocation } from "react-router-dom";
+import CaptainProgramPage from "./pages/CaptainProgramPage";
+import CaptainProfilePage from "./pages/CaptainProfilePage";
 import HomePage from "./pages/HomePage";
 import CalendarPage from "./pages/CalendarPage";
 import BoatsBrowsePage from "./pages/BoatsBrowsePage";
@@ -22,18 +24,21 @@ import AdminPayoutsPage from "./pages/admin/AdminPayoutsPage";
 import AdminSettingsPage from "./pages/admin/AdminSettingsPage";
 import AdminReviewsPage from "./pages/admin/AdminReviewsPage";
 import AdminCaptainsPage from "./pages/admin/AdminCaptainsPage";
+import AdminContactInquiriesPage from "./pages/admin/AdminContactInquiriesPage";
 import ToastHost from "./components/ToastHost";
 import { SavedBoatsProvider } from "./hooks/useSavedBoats";
 import { RenterAuthProvider, RequireRenter } from "./renter/RenterAuth";
 import AccountLoginPage from "./pages/account/AccountLoginPage";
 import AccountRegisterPage from "./pages/account/AccountRegisterPage";
 import AccountPage from "./pages/account/AccountPage";
+import SiteFooter from "./components/SiteFooter";
 
 export default function App() {
   const { pathname } = useLocation();
   const isMarketplace =
     pathname === "/" ||
     pathname.startsWith("/boats") ||
+    pathname.startsWith("/captains") ||
     pathname.startsWith("/calendar") ||
     pathname.startsWith("/account");
   const isCalendar = pathname === "/calendar";
@@ -51,6 +56,8 @@ export default function App() {
         <main className={isCalendar ? "main main--calendar" : isAdmin || isMarketplace ? "" : "main"}>
           <Routes>
             <Route path="/" element={<HomePage />} />
+            <Route path="/captains" element={<CaptainProgramPage />} />
+            <Route path="/captains/:slug" element={<CaptainProfilePage />} />
             <Route path="/boats" element={<BoatsBrowsePage />} />
             <Route path="/boats/:slug" element={<BoatDetailPage />} />
             <Route path="/boats/:slug/book" element={<BoatRentalBookPage />} />
@@ -77,7 +84,7 @@ export default function App() {
               path="/admin"
               element={
                 <RequireSuperAdmin>
-                  <AdminLayout brand="Alis" subtitle="Platform admin" />
+                  <AdminLayout subtitle="Platform admin" />
                 </RequireSuperAdmin>
               }
             >
@@ -88,13 +95,14 @@ export default function App() {
               <Route path="promos" element={<AdminPromosPage />} />
               <Route path="bookings" element={<AdminBookingsPage />} />
               <Route path="reviews" element={<AdminReviewsPage />} />
+              <Route path="contact-inquiries" element={<AdminContactInquiriesPage />} />
               <Route path="settings" element={<AdminSettingsPage />} />
             </Route>
             <Route
               path="/owner"
               element={
                 <RequireOwner>
-                  <AdminLayout basePath="/owner" brand="My boats" subtitle="Owner" />
+                  <AdminLayout basePath="/owner" subtitle="Owner" />
                 </RequireOwner>
               }
             >
@@ -109,6 +117,7 @@ export default function App() {
             </Route>
           </Routes>
         </main>
+        {!isAdmin && <SiteFooter />}
       </div>
     </AdminAuthProvider>
     </SavedBoatsProvider>

@@ -191,6 +191,9 @@ export type BoatCaptainProfile = {
   review_count: number;
   trips_completed: number;
   coast_guard_verified: boolean;
+  experience: string | null;
+  license_types: string[];
+  specializations: string[];
 };
 
 export type AllowedOnBoatItem = {
@@ -263,7 +266,34 @@ export type CaptainProfilePage = {
   aboard_since_year: number | null;
   location: string | null;
   trips_completed: number;
+  experience: string | null;
+  license_types: string[];
+  specializations: string[];
   boats: ProfileBoat[];
+  reviews: ProfileReview[];
+};
+
+export type CaptainListItem = {
+  id: string;
+  slug: string;
+  name: string;
+  photo_url: string | null;
+  rating: number | null;
+  review_count: number;
+  coast_guard_verified: boolean;
+  bio: string | null;
+  location: string | null;
+  experience: string | null;
+  license_types: string[];
+  specializations: string[];
+};
+
+export type CaptainSearchParams = {
+  license?: string[];
+  experience?: string;
+  specialization?: string[];
+  limit?: number;
+  offset?: number;
 };
 
 export type CaptainPref = "captained" | "bareboat";
@@ -433,6 +463,25 @@ export async function fetchCaptainProfile(
   const r = await apiFetch(
     `${API}/api/boats/${encodeURIComponent(boatSlug)}/captains/${encodeURIComponent(captainId)}/profile`
   );
+  if (!r.ok) throw new Error("Captain profile not found");
+  return r.json();
+}
+
+export async function fetchCaptains(params: CaptainSearchParams = {}): Promise<CaptainListItem[]> {
+  const q = new URLSearchParams();
+  for (const item of params.license ?? []) q.append("license", item);
+  if (params.experience) q.set("experience", params.experience);
+  for (const item of params.specialization ?? []) q.append("specialization", item);
+  if (params.limit != null) q.set("limit", String(params.limit));
+  if (params.offset != null) q.set("offset", String(params.offset));
+  const qs = q.toString();
+  const r = await apiFetch(`${API}/api/captains${qs ? `?${qs}` : ""}`);
+  if (!r.ok) throw new Error("Could not load captains");
+  return r.json();
+}
+
+export async function fetchCaptainBySlug(slug: string): Promise<CaptainProfilePage> {
+  const r = await apiFetch(`${API}/api/captains/${encodeURIComponent(slug)}`);
   if (!r.ok) throw new Error("Captain profile not found");
   return r.json();
 }
@@ -630,6 +679,29 @@ export async function confirmBookingPayment(
   if (!r.ok) {
     const msg = typeof data.detail === "string" ? data.detail : "Payment confirmation failed";
     throw new Error(msg);
+  }
+  return data;
+}
+
+export type ContactInquiryPayload = {
+  first_name: string;
+  last_name: string;
+  email: string;
+  phone: string;
+  message?: string;
+};
+
+export async function submitContactInquiry(
+  payload: ContactInquiryPayload
+): Promise<{ id: number; ok: boolean }> {
+  const r = await apiFetch(`${API}/api/contact`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const data = await r.json();
+  if (!r.ok) {
+    throw new Error(typeof data.detail === "string" ? data.detail : "Could not send message");
   }
   return data;
 }

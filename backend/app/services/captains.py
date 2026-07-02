@@ -3,6 +3,7 @@ from typing import TypedDict
 
 from sqlalchemy.orm import Session
 
+from app.listings import json_list_from_db
 from app.models import Activity, Booking, BookingStatus, Captain, Review
 from app.schemas import BoatCaptainProfileOut
 
@@ -73,6 +74,9 @@ def captain_to_profile(db: Session, captain: Captain) -> BoatCaptainProfileOut:
         review_count=stats["review_count"],
         trips_completed=stats["trips_completed"],
         coast_guard_verified=captain.coast_guard_verified,
+        experience=captain.experience,
+        license_types=json_list_from_db(captain.license_types),
+        specializations=json_list_from_db(captain.specializations),
     )
 
 

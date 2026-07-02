@@ -146,6 +146,9 @@ class Captain(Base):
     phone_verified: Mapped[bool] = mapped_column(Boolean, default=False)
     aboard_since_year: Mapped[int | None] = mapped_column(Integer)
     photo_url: Mapped[str | None] = mapped_column(String(500))
+    experience: Mapped[str | None] = mapped_column(String(40))
+    license_types: Mapped[str | None] = mapped_column(Text)  # JSON string[]
+    specializations: Mapped[str | None] = mapped_column(Text)  # JSON string[]
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
@@ -346,3 +349,16 @@ class Review(Base):
     booking: Mapped["Booking | None"] = relationship()
     activity: Mapped["Activity"] = relationship()
     user: Mapped["User"] = relationship()
+
+
+class ContactInquiry(Base):
+    __tablename__ = "contact_inquiries"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    first_name: Mapped[str] = mapped_column(String(80))
+    last_name: Mapped[str] = mapped_column(String(80))
+    email: Mapped[str] = mapped_column(String(200))
+    phone: Mapped[str] = mapped_column(String(40))
+    message: Mapped[str | None] = mapped_column(Text)
+    is_read: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))

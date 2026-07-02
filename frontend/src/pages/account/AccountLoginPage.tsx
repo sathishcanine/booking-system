@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import GoogleSignInButton from "../../components/GoogleSignInButton";
+import AlisAdventureLogo from "../../components/AlisAdventureLogo";
 import MarketplaceNav from "../../components/MarketplaceNav";
 import { useRenterAuth } from "../../renter/RenterAuth";
 import { renterGoogleLogin } from "../../renter/renterApi";
@@ -32,6 +33,7 @@ export default function AccountLoginPage() {
       <MarketplaceNav />
       <div className="account-auth-page">
         <div className="account-auth-card">
+          <AlisAdventureLogo size="auth" linkTo="/" className="account-auth-logo" />
           <h1>Sign in</h1>
           <p>View your trips and saved boats.</p>
           <GoogleSignInButton

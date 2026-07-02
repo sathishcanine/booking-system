@@ -192,6 +192,9 @@ class AdminCaptainIn(BaseModel):
     bio: str | None = None
     location: str | None = Field(default=None, max_length=120)
     photo_url: str | None = Field(default=None, max_length=500)
+    experience: str | None = Field(default=None, max_length=40)
+    license_types: list[str] = Field(default_factory=list)
+    specializations: list[str] = Field(default_factory=list)
     coast_guard_verified: bool = False
     phone_verified: bool = False
     is_active: bool = True
@@ -207,6 +210,9 @@ class AdminCaptainOut(BaseModel):
     bio: str | None = None
     location: str | None = None
     photo_url: str | None = None
+    experience: str | None = None
+    license_types: list[str] = Field(default_factory=list)
+    specializations: list[str] = Field(default_factory=list)
     rating: float | None = None
     review_count: int = 0
     trips_completed: int = 0
@@ -486,3 +492,14 @@ class EarningsOut(BaseModel):
     paid_booking_count: int
     connect: ConnectStatusOut | None = None
     recent_bookings: list[EarningsBookingOut] = []
+
+
+class AdminContactInquiryOut(BaseModel):
+    id: int
+    first_name: str
+    last_name: str
+    email: str
+    phone: str
+    message: str | None = None
+    is_read: bool
+    created_at: datetime
